@@ -305,8 +305,36 @@ function extractSkills(text: string): string[] {
   const foundSkills = new Set<string>();
   const lowerText = text.toLowerCase();
   
+  // Blacklist of common false positives
+  const blacklist = ['cv', 'pdf', 'doc', 'page', 'new', 'old'];
+  
   // Method 1: Direct matching from skills dictionary with better patterns
   for (const skill of SKILLS_DICT) {
+    // Skip blacklisted terms
+    if (blacklist.includes(skill.toLowerCase())) {
+      continue;
+    }
+    
+    // Skip very short skills that are likely false positives (except specific valid ones)
+    const validShortSkills = ['r', 'c', 'go', 'ai', 'ml', 'dl', 'cv', 'ui', 'ux'];
+    if (skill.length <= 2 && !validShortSkills.includes(skill.toLowerCase())) {
+      continue;
+    }
+    
+    // For very short skills, require stronger context
+    if (skill.length <= 3) {
+      // Check if it appears in a skills context
+      const contextPatterns = [
+        new RegExp(`(?:skills?|technologies?|proficient|experience|knowledge).*?\\b${skill}\\b`, 'i'),
+        new RegExp(`\\b${skill}\\b.*?(?:developer|engineer|programming|language)`, 'i'),
+        new RegExp(`\\b${skill}\\b\\s*[,;/&]`, 'i'), // Appears in a list
+      ];
+      
+      if (!contextPatterns.some(p => p.test(lowerText))) {
+        continue;
+      }
+    }
+    
     // Escape special regex characters
     const escaped = skill.replace(/[+.^$*|{}()[\]\\]/g, '\\$&');
     // Use word boundaries but handle special cases like .net, c++, c#
@@ -389,100 +417,114 @@ async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
   
   try {
     const uint8Array = new Uint8Array(arrayBuffer);
-    const decoder = new TextDecoder('utf-8', { fatal: false });
-    const rawText = decoder.decode(uint8Array);
+    const pdfString = new TextDecoder('latin1').decode(uint8Array);
     
-    let extractedText = '';
     const textParts: string[] = [];
     
-    // Method 1: Extract from stream objects with comprehensive operators
-    const streamPattern = /stream\s+([\s\S]*?)\s+endstream/g;
-    const streams = [...rawText.matchAll(streamPattern)];
+    // Extract text from uncompressed streams first
+    const streamPattern = /stream\s*\r?\n([\s\S]*?)\r?\nendstream/g;
+    const streams = [...pdfString.matchAll(streamPattern)];
     
     console.log(`Found ${streams.length} stream objects`);
     
+    // Extract all text objects (both compressed and uncompressed)
     for (const stream of streams) {
-      const streamContent = stream[1];
+      let streamContent = stream[1];
       
-      // Extract text from various PDF text operators
-      // Tj operator: (text) Tj
-      const tjMatches = streamContent.matchAll(/\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj/g);
-      for (const match of tjMatches) {
-        textParts.push(match[1]);
-      }
+      // Try to extract text directly if uncompressed
+      const textOperators = [
+        /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj/g,  // Tj operator
+        /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*TJ/g,  // TJ operator  
+        /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*'/g,   // ' operator
+        /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*"/g    // " operator
+      ];
       
-      // TJ operator: [(text)] TJ
-      const tjArrayMatches = streamContent.matchAll(/\[\s*\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*\]\s*TJ/g);
-      for (const match of tjArrayMatches) {
-        textParts.push(match[1]);
-      }
-      
-      // ' operator: (text) '
-      const quoteMatches = streamContent.matchAll(/\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*'/g);
-      for (const match of quoteMatches) {
-        textParts.push(match[1]);
+      for (const pattern of textOperators) {
+        const matches = [...streamContent.matchAll(pattern)];
+        for (const match of matches) {
+          if (match[1] && match[1].trim().length > 0) {
+            textParts.push(match[1]);
+          }
+        }
       }
     }
     
-    // Method 2: Extract from BT/ET blocks (text blocks)
+    // Extract from BT/ET text blocks
     const btPattern = /BT\s+([\s\S]*?)\s+ET/g;
-    const textBlocks = [...rawText.matchAll(btPattern)];
-    
+    const textBlocks = [...pdfString.matchAll(btPattern)];
     console.log(`Found ${textBlocks.length} BT/ET text blocks`);
     
     for (const block of textBlocks) {
       const blockContent = block[1];
-      
-      // Extract all text within parentheses in text blocks
       const parenthesesMatches = blockContent.matchAll(/\(([^)\\]*(?:\\.[^)\\]*)*)\)/g);
       for (const match of parenthesesMatches) {
-        textParts.push(match[1]);
+        if (match[1] && match[1].trim().length > 0) {
+          textParts.push(match[1]);
+        }
       }
     }
     
-    // Method 3: Global parentheses extraction (fallback)
-    if (textParts.length < 20) {
-      console.log('Low extraction, using global parentheses method...');
-      const globalMatches = rawText.matchAll(/\(([^)\\]{3,}(?:\\.[^)\\]*)*)\)/g);
+    // Fallback: Global search for text in parentheses
+    if (textParts.length < 10) {
+      console.log('Low extraction, using global method...');
+      const globalPattern = /\(([^\)]{2,})\)/g;
+      const globalMatches = [...pdfString.matchAll(globalPattern)];
+      
       for (const match of globalMatches) {
         const text = match[1];
-        // Filter out binary/hex data
-        if (!/^[\x00-\x1F\x7F-\xFF]{5,}/.test(text)) {
+        // Only include if it looks like readable text
+        const readableChars = text.replace(/[^a-zA-Z0-9\s]/g, '').length;
+        if (readableChars > text.length * 0.3 && text.length >= 2) {
           textParts.push(text);
         }
       }
     }
     
-    // Process and decode extracted text parts
+    console.log(`Extracted ${textParts.length} text parts`);
+    
+    // Decode extracted text parts
+    let extractedText = '';
     for (const part of textParts) {
       let decoded = part
-        // Decode PDF escape sequences
+        // PDF escape sequences
         .replace(/\\n/g, '\n')
         .replace(/\\r/g, '\n')
-        .replace(/\\t/g, '\t')
+        .replace(/\\t/g, ' ')
         .replace(/\\\(/g, '(')
         .replace(/\\\)/g, ')')
         .replace(/\\\\/g, '\\')
-        .replace(/\\(\d{3})/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)))
-        // Clean up
-        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, ' ');
+        .replace(/\\b/g, '\b')
+        .replace(/\\f/g, '\f')
+        // Octal sequences
+        .replace(/\\(\d{3})/g, (_, oct) => {
+          try {
+            return String.fromCharCode(parseInt(oct, 8));
+          } catch {
+            return '';
+          }
+        })
+        // Clean control characters but keep newlines
+        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, ' ')
+        .trim();
       
-      extractedText += decoded + ' ';
+      if (decoded.length > 0) {
+        extractedText += decoded + ' ';
+      }
     }
     
-    // Clean up final text
+    // Final cleanup
     let finalText = extractedText
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space between camelCase
-      .replace(/([a-zA-Z])(\d)/g, '$1 $2') // Add space between letters and numbers
-      .replace(/(\d)([a-zA-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')  // Normalize whitespace
+      .replace(/([a-z])([A-Z])/g, '$1 $2')  // Add space in camelCase
+      .replace(/([a-zA-Z])(\d)/g, '$1 $2')  // Space between letter and number
+      .replace(/(\d)([a-zA-Z])/g, '$1 $2')  // Space between number and letter
       .trim();
     
-    console.log(`Text extracted, length: ${finalText.length}`);
-    console.log(`First 500 chars: ${finalText.substring(0, 500)}`);
+    console.log(`Final text extracted, length: ${finalText.length}`);
+    console.log(`First 1000 chars: ${finalText.substring(0, 1000)}`);
     
-    if (finalText.length < 50) {
-      throw new Error(`Extracted text is too short (${finalText.length} chars)`);
+    if (finalText.length < 30) {
+      throw new Error(`Extracted text too short (${finalText.length} chars). PDF may be image-based or use unsupported encoding.`);
     }
     
     return finalText;
