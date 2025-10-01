@@ -142,6 +142,73 @@ serve(async (req) => {
       }
     }
 
+    // Advanced text cleaning and preprocessing
+    console.log('Applying advanced text cleaning...');
+    
+    // Remove common PDF artifacts
+    textContent = textContent
+      .replace(/obj\s*<<\s*\/Type/g, ' ')           // PDF objects
+      .replace(/\/[A-Z][a-z]+\s+/g, ' ')            // PDF commands
+      .replace(/\d+\s+\d+\s+obj/g, ' ')             // Object references
+      .replace(/endobj/g, ' ')
+      .replace(/stream|endstream/g, ' ')
+      .replace(/startxref/g, ' ')
+      .replace(/xref/g, ' ')
+      .replace(/%%EOF/g, ' ')
+      .replace(/\[(\s*\d+\s*)+\]/g, ' ')           // Number arrays
+      .replace(/[<>]{2,}/g, ' ')                    // Multiple brackets
+      .replace(/\d{10,}/g, ' ')                     // Very long numbers
+      .trim();
+    
+    // Extract text near common CV section headers
+    const cvSections = [
+      'skills', 'experience', 'education', 'work experience', 
+      'technical skills', 'professional skills', 'expertise',
+      'qualifications', 'competencies', 'proficiencies',
+      'projects', 'achievements', 'certifications', 'languages',
+      'tools', 'technologies', 'summary', 'profile', 'about'
+    ];
+    
+    let sectionText = '';
+    for (const section of cvSections) {
+      const regex = new RegExp(`${section}[:\\s\\-]*((?:[^\\n]{0,200}\\n?){0,20})`, 'gi');
+      const matches = textContent.match(regex);
+      if (matches) {
+        sectionText += '\n\n' + matches.join('\n');
+      }
+    }
+    
+    // If we found section-based text, prepend it for better extraction
+    if (sectionText.length > 50) {
+      textContent = sectionText + '\n\n' + textContent;
+      console.log('Enhanced with section-based extraction:', sectionText.length, 'chars');
+    }
+    
+    // Extract potential skills using common patterns
+    const skillPatterns = [
+      /\b(?:Python|Java|JavaScript|TypeScript|C\+\+|C#|PHP|Ruby|Go|Rust|Swift|Kotlin)\b/gi,
+      /\b(?:React|Angular|Vue|Django|Flask|Spring|Node\.js|Express|FastAPI)\b/gi,
+      /\b(?:SQL|MySQL|PostgreSQL|MongoDB|Redis|Oracle|Firebase|Supabase)\b/gi,
+      /\b(?:AWS|Azure|GCP|Docker|Kubernetes|Jenkins|Git|GitHub|GitLab)\b/gi,
+      /\b(?:Machine Learning|AI|Data Analysis|Data Science|Deep Learning)\b/gi,
+      /\b(?:Communication|Leadership|Teamwork|Problem[\s-]solving|Analytical)\b/gi,
+    ];
+    
+    const foundSkills: string[] = [];
+    for (const pattern of skillPatterns) {
+      const matches = textContent.match(pattern);
+      if (matches) {
+        foundSkills.push(...matches);
+      }
+    }
+    
+    if (foundSkills.length > 0) {
+      console.log('Pre-extracted skills:', foundSkills.join(', '));
+      textContent = `DETECTED SKILLS: ${foundSkills.join(', ')}\n\n` + textContent;
+    }
+    
+    console.log('Final cleaned text length:', textContent.length);
+
     // Use Lovable AI to extract structured information
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -200,7 +267,16 @@ RULES:
           },
           {
             role: 'user',
-            content: `AGGRESSIVELY extract ALL information from this CV. Extract every possible skill, even if uncertain:\n\n${textContent.slice(0, 30000)}`
+            content: `EXTRACT EVERYTHING from this CV. Look for:
+- ANY capitalized name (first name, last name, full name)
+- ANY email address with @ symbol
+- ANY phone number (with +, -, spaces, parentheses)
+- ANY URLs or social media links
+- EVERY SINGLE skill, tool, technology, programming language, framework, database, certification, or competency mentioned
+
+The text below may contain pre-extracted skills at the top. Use those AND find more:
+
+${textContent.slice(0, 35000)}`
           }
         ],
         tools: [
