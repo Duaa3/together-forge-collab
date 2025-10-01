@@ -264,19 +264,24 @@ serve(async (req) => {
     
     // Check if text is readable: at least 30% should be alphanumeric
     const alphanumericCount = (extractedText.match(/[a-zA-Z0-9]/g) || []).length;
-    const readabilityRatio = extractedText.length > 0 ? alphanumericCount / extractedText.length : 0;
+    const totalChars = extractedText.length;
+    const readabilityRatio = totalChars > 0 ? alphanumericCount / totalChars : 0;
     
-    // Also check for common readable words
-    const commonWords = ['the', 'and', 'for', 'with', 'experience', 'skill', 'work', 'project', 'education'];
-    const hasCommonWords = commonWords.some(word => extractedText.toLowerCase().includes(word));
+    // Check for common readable patterns
+    const hasValidEmail = /@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(extractedText);
+    const hasValidWords = /\b[a-zA-Z]{4,}\b/.test(extractedText); // At least one 4+ letter word
+    const hasExcessiveSpecialChars = (extractedText.match(/[^a-zA-Z0-9\s@.+\-()]/g) || []).length / totalChars > 0.4;
     
     const needsOCR = !extractedText || 
                      cleanText.length < 50 || 
-                     readabilityRatio < 0.3 || 
-                     !hasCommonWords;
+                     readabilityRatio < 0.4 ||
+                     !hasValidWords ||
+                     hasExcessiveSpecialChars;
     
     console.log('Readability ratio:', readabilityRatio.toFixed(2));
-    console.log('Has common words:', hasCommonWords);
+    console.log('Has valid email:', hasValidEmail);
+    console.log('Has valid words:', hasValidWords);
+    console.log('Excessive special chars:', hasExcessiveSpecialChars);
     console.log('Needs OCR:', needsOCR);
     
     if (needsOCR) {
