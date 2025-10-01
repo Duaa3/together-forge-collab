@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       candidates: {
         Row: {
+          cv_path: string | null
           decision: string | null
           email: string | null
           extracted_skills: Json | null
@@ -31,6 +32,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cv_path?: string | null
           decision?: string | null
           email?: string | null
           extracted_skills?: Json | null
@@ -46,6 +48,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cv_path?: string | null
           decision?: string | null
           email?: string | null
           extracted_skills?: Json | null
