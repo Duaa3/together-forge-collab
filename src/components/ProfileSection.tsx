@@ -72,6 +72,35 @@ const ProfileSection = () => {
     }
   };
 
+  const getSignedCVUrl = async (filePath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('cvs')
+        .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+      if (error) throw error;
+      return data.signedUrl;
+    } catch (error) {
+      console.error('Error getting signed URL:', error);
+      return null;
+    }
+  };
+
+  const handleViewCV = async () => {
+    if (!profile?.cv_url) return;
+    
+    const signedUrl = await getSignedCVUrl(profile.cv_url);
+    if (signedUrl) {
+      window.open(signedUrl, '_blank');
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to load CV",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSave = async () => {
     if (!profile) return;
 
@@ -147,18 +176,15 @@ const ProfileSection = () => {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('cvs')
-        .getPublicUrl(fileName);
-
+      // Store the file path instead of URL
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ cv_url: publicUrl })
+        .update({ cv_url: fileName })
         .eq('id', profile?.id);
 
       if (updateError) throw updateError;
 
-      setProfile({ ...profile!, cv_url: publicUrl });
+      setProfile({ ...profile!, cv_url: fileName });
 
       toast({
         title: "Success",
@@ -361,10 +387,8 @@ const ProfileSection = () => {
               </label>
             </Button>
             {profile.cv_url && (
-              <Button variant="secondary" asChild>
-                <a href={profile.cv_url} target="_blank" rel="noopener noreferrer">
-                  View Current CV
-                </a>
+              <Button variant="secondary" onClick={handleViewCV}>
+                View Current CV
               </Button>
             )}
           </div>
