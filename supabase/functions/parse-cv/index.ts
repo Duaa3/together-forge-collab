@@ -34,20 +34,59 @@ serve(async (req) => {
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Convert to base64 for text extraction
-    // Note: For production, you'd want to use a proper PDF/DOC parser
-    // For now, we'll convert to string and let AI extract what it can
+    // Extract text content using comprehensive PDF extraction
     const decoder = new TextDecoder('utf-8', { fatal: false });
-    let textContent = decoder.decode(uint8Array);
+    let rawText = decoder.decode(uint8Array);
+    let textContent = '';
     
-    // If it's a PDF, try to extract readable text (simple approach)
-    // This is a basic extraction - for better results, use a PDF parsing library
+    // Enhanced PDF text extraction
     if (file.name.toLowerCase().endsWith('.pdf')) {
-      // Extract text between PDF text markers
-      const textMatches = textContent.match(/\(([^)]+)\)/g);
-      if (textMatches) {
-        textContent = textMatches.map(m => m.slice(1, -1)).join(' ');
+      // Extract text between parentheses (basic PDF text objects)
+      const textInParens = rawText.match(/\(([^)]+)\)/g);
+      if (textInParens) {
+        textContent += textInParens.map(m => m.slice(1, -1)).join(' ') + ' ';
       }
+      
+      // Extract text between angle brackets (PDF hex strings)
+      const hexStrings = rawText.match(/<([0-9A-Fa-f\s]+)>/g);
+      if (hexStrings) {
+        hexStrings.forEach(hex => {
+          const cleaned = hex.slice(1, -1).replace(/\s/g, '');
+          try {
+            // Convert hex to ASCII
+            let str = '';
+            for (let i = 0; i < cleaned.length; i += 2) {
+              const charCode = parseInt(cleaned.substr(i, 2), 16);
+              if (charCode >= 32 && charCode < 127) {
+                str += String.fromCharCode(charCode);
+              }
+            }
+            textContent += str + ' ';
+          } catch (e) {
+            // Skip invalid hex strings
+          }
+        });
+      }
+      
+      // Extract text after BT/ET markers (PDF text blocks)
+      const btMatches = rawText.match(/BT\s+(.*?)\s+ET/gs);
+      if (btMatches) {
+        btMatches.forEach(block => {
+          const textMatch = block.match(/\[([^\]]+)\]/g);
+          if (textMatch) {
+            textContent += textMatch.map(m => m.slice(1, -1)).join(' ') + ' ';
+          }
+        });
+      }
+      
+      // Clean up the extracted text
+      textContent = textContent
+        .replace(/\\[nrt]/g, ' ')  // Remove escape sequences
+        .replace(/\s+/g, ' ')      // Collapse whitespace
+        .trim();
+    } else {
+      // For non-PDF files, use raw text
+      textContent = rawText;
     }
 
     console.log('Text content length:', textContent.length);
@@ -69,19 +108,22 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a CV/Resume parser. Extract the following information from the CV text:
-- Full Name
-- Email address
-- Phone number
-- Links (LinkedIn, GitHub, personal website, etc.)
-- Skills (technical and professional skills)
+            content: `You are an expert CV/Resume parser. Extract information even from poorly formatted or fragmented text.
 
-Return ONLY a valid JSON object with these exact keys: name, email, phone, links (array), skills (array).
-If any field is not found, use empty string for strings or empty array for arrays.`
+IMPORTANT INSTRUCTIONS:
+- Look for candidate name at the top of the document or near "CV" or "Resume"
+- Email: Look for text matching email patterns (contains @ and domain)
+- Phone: Look for number patterns (may include +, country codes, spaces, dashes)
+- Links: Extract any URLs (LinkedIn, GitHub, portfolios, etc.)
+- Skills: Extract ALL technical, professional, and soft skills mentioned
+
+Be flexible with formatting and extract information even if it's fragmented or mixed with other characters.
+If you cannot find a field, return empty string for name/email/phone or empty array for links/skills.
+Do NOT make up information - only extract what's actually present.`
           },
           {
             role: 'user',
-            content: `Parse this CV and extract the required information:\n\n${textContent.slice(0, 15000)}`
+            content: `Extract all information from this CV text. Be thorough and extract skills even if they appear scattered:\n\n${textContent.slice(0, 20000)}`
           }
         ],
         tools: [
