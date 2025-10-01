@@ -30,66 +30,103 @@ serve(async (req) => {
 
     console.log('File received:', file.name, 'Size:', file.size);
 
-    // Read file content
+    let textContent = '';
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Extract text content using comprehensive PDF extraction
-    const decoder = new TextDecoder('utf-8', { fatal: false });
-    let rawText = decoder.decode(uint8Array);
-    let textContent = '';
-    
-    // Enhanced PDF text extraction
-    if (file.name.toLowerCase().endsWith('.pdf')) {
-      // Extract text between parentheses (basic PDF text objects)
-      const textInParens = rawText.match(/\(([^)]+)\)/g);
-      if (textInParens) {
-        textContent += textInParens.map(m => m.slice(1, -1)).join(' ') + ' ';
-      }
-      
-      // Extract text between angle brackets (PDF hex strings)
-      const hexStrings = rawText.match(/<([0-9A-Fa-f\s]+)>/g);
-      if (hexStrings) {
-        hexStrings.forEach(hex => {
-          const cleaned = hex.slice(1, -1).replace(/\s/g, '');
-          try {
-            // Convert hex to ASCII
-            let str = '';
-            for (let i = 0; i < cleaned.length; i += 2) {
-              const charCode = parseInt(cleaned.substr(i, 2), 16);
-              if (charCode >= 32 && charCode < 127) {
-                str += String.fromCharCode(charCode);
-              }
-            }
-            textContent += str + ' ';
-          } catch (e) {
-            // Skip invalid hex strings
-          }
-        });
-      }
-      
-      // Extract text after BT/ET markers (PDF text blocks)
-      const btMatches = rawText.match(/BT\s+(.*?)\s+ET/gs);
-      if (btMatches) {
-        btMatches.forEach(block => {
-          const textMatch = block.match(/\[([^\]]+)\]/g);
-          if (textMatch) {
-            textContent += textMatch.map(m => m.slice(1, -1)).join(' ') + ' ';
-          }
-        });
-      }
-      
-      // Clean up the extracted text
-      textContent = textContent
-        .replace(/\\[nrt]/g, ' ')  // Remove escape sequences
-        .replace(/\s+/g, ' ')      // Collapse whitespace
-        .trim();
-    } else {
-      // For non-PDF files, use raw text
-      textContent = rawText;
-    }
 
-    console.log('Text content length:', textContent.length);
+    // Multi-method PDF text extraction for different PDF encodings
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      console.log('Extracting text from PDF using multiple methods...');
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      const rawText = decoder.decode(uint8Array);
+      
+      const extractedTexts: string[] = [];
+      
+      // Method 1: Text in parentheses (most common in PDFs)
+      const parenMatches = rawText.match(/\(([^)]{2,})\)/g);
+      if (parenMatches) {
+        const parenText = parenMatches
+          .map(m => m.slice(1, -1))
+          .map(t => t.replace(/\\([nrt])/g, ' '))  // Replace escape sequences
+          .join(' ');
+        extractedTexts.push(parenText);
+        console.log('Method 1 (parentheses): extracted', parenText.length, 'chars');
+      }
+      
+      // Method 2: Hex strings in angle brackets
+      const hexMatches = rawText.match(/<([0-9A-Fa-f\s]{4,})>/g);
+      if (hexMatches) {
+        const hexText = hexMatches.map(hex => {
+          const cleaned = hex.slice(1, -1).replace(/\s/g, '');
+          let decoded = '';
+          for (let i = 0; i < cleaned.length - 1; i += 2) {
+            const charCode = parseInt(cleaned.substr(i, 2), 16);
+            if (charCode >= 32 && charCode <= 126) {
+              decoded += String.fromCharCode(charCode);
+            }
+          }
+          return decoded;
+        }).join(' ');
+        extractedTexts.push(hexText);
+        console.log('Method 2 (hex): extracted', hexText.length, 'chars');
+      }
+      
+      // Method 3: Text between BT/ET markers
+      const btMatches = rawText.match(/BT\s+([\s\S]*?)\s+ET/g);
+      if (btMatches) {
+        const btText = btMatches.map(block => {
+          // Extract text from Tj and TJ operators
+          const tjMatches = block.match(/\(([^)]+)\)\s*T[jJ]/g);
+          if (tjMatches) {
+            return tjMatches.map(m => m.match(/\(([^)]+)\)/)?.[1] || '').join(' ');
+          }
+          return '';
+        }).join(' ');
+        extractedTexts.push(btText);
+        console.log('Method 3 (BT/ET): extracted', btText.length, 'chars');
+      }
+      
+      // Method 4: Text after /F operators (font changes)
+      const fontMatches = rawText.match(/\/F\d+\s+[\d.]+\s+Tf\s*\(([^)]+)\)/g);
+      if (fontMatches) {
+        const fontText = fontMatches
+          .map(m => m.match(/\(([^)]+)\)/)?.[1] || '')
+          .join(' ');
+        extractedTexts.push(fontText);
+        console.log('Method 4 (fonts): extracted', fontText.length, 'chars');
+      }
+      
+      // Method 5: Look for stream data
+      const streamMatches = rawText.match(/stream\s+([\s\S]*?)\s+endstream/g);
+      if (streamMatches) {
+        streamMatches.forEach(stream => {
+          const streamText = stream.match(/\(([^)]+)\)/g);
+          if (streamText) {
+            extractedTexts.push(streamText.map(m => m.slice(1, -1)).join(' '));
+          }
+        });
+        console.log('Method 5 (streams): extracted text');
+      }
+      
+      // Combine all extracted text
+      textContent = extractedTexts.join('\n\n');
+      
+      // Clean up the combined text
+      textContent = textContent
+        .replace(/\\([nrt()])/g, ' ')    // Remove escape sequences
+        .replace(/\s+/g, ' ')             // Collapse whitespace
+        .replace(/[^\x20-\x7E\n]/g, '')  // Remove non-printable chars
+        .trim();
+      
+      console.log('Total extracted text length:', textContent.length);
+    } else {
+      // For non-PDF files
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      textContent = decoder.decode(uint8Array);
+    }
+    
+    // Log preview for debugging
+    console.log('Text preview (first 1000 chars):', textContent.slice(0, 1000));
 
     // Use Lovable AI to extract structured information
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -108,22 +145,26 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert CV/Resume parser. Extract information even from poorly formatted or fragmented text.
+            content: `You are an expert CV/Resume parser specialized in extracting information from noisy or poorly formatted text.
 
-IMPORTANT INSTRUCTIONS:
-- Look for candidate name at the top of the document or near "CV" or "Resume"
-- Email: Look for text matching email patterns (contains @ and domain)
-- Phone: Look for number patterns (may include +, country codes, spaces, dashes)
-- Links: Extract any URLs (LinkedIn, GitHub, portfolios, etc.)
-- Skills: Extract ALL technical, professional, and soft skills mentioned
+CRITICAL EXTRACTION RULES:
+1. NAME: Look for capitalized full names at the start, near "CV", "Resume", or after "Name:"
+2. EMAIL: Find patterns with @ symbol (e.g., name@domain.com)
+3. PHONE: Find number sequences with + country codes, dashes, spaces, or parentheses
+4. LINKS: Extract any URLs or domains (linkedin.com, github.com, etc.)
+5. SKILLS: Extract ANY technical, professional, or soft skills mentioned throughout the text
 
-Be flexible with formatting and extract information even if it's fragmented or mixed with other characters.
-If you cannot find a field, return empty string for name/email/phone or empty array for links/skills.
-Do NOT make up information - only extract what's actually present.`
+IMPORTANT:
+- Work with fragmented or noisy text - piece together information
+- If text is garbled, look for partial matches (e.g., "python", "java", "communication")
+- Extract skills even if they appear in lists, sentences, or mixed with other text
+- Common skill categories: programming languages, frameworks, tools, soft skills, certifications
+- Don't invent information - only extract what's present
+- If truly nothing is found for a field, return empty string/array`
           },
           {
             role: 'user',
-            content: `Extract all information from this CV text. Be thorough and extract skills even if they appear scattered:\n\n${textContent.slice(0, 20000)}`
+            content: `Parse this CV text and extract all information. The text may be fragmented or noisy, so be thorough:\n\n${textContent.slice(0, 25000)}`
           }
         ],
         tools: [
