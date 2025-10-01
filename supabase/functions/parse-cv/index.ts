@@ -21,101 +21,41 @@ const SKILLS_DICT = [
   'swift', 'kotlin', 'php', 'scala', 'r', 'perl', 'dart', 'objective-c', 'c',
   // Frontend
   'react', 'angular', 'vue', 'svelte', 'next.js', 'nuxt.js', 'jquery', 'bootstrap',
-  'tailwind', 'html', 'css', 'sass', 'less', 'webpack', 'vite', 'redux', 'mobx',
+  'tailwind', 'html', 'css', 'sass', 'less', 'webpack', 'vite', 'redux', 'mobx', 'streamlit',
   // Backend
   'node.js', 'express', 'django', 'flask', 'spring', 'spring boot', '.net', 'fastapi',
-  'laravel', 'ruby on rails', 'asp.net', 'graphql', 'rest', 'api', 'nestjs',
+  'laravel', 'ruby on rails', 'asp.net', 'graphql', 'rest', 'restful', 'api', 'nestjs', 'swagger',
   // Databases
   'postgresql', 'mysql', 'mongodb', 'redis', 'oracle', 'sql server', 'supabase',
-  'firebase', 'dynamodb', 'cassandra', 'sqlite', 'mariadb', 'sql', 'nosql',
+  'firebase', 'dynamodb', 'cassandra', 'sqlite', 'mariadb', 'sql', 'nosql', 'postgres',
   // Cloud & DevOps
   'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins', 'ci/cd', 'terraform',
   'ansible', 'circleci', 'gitlab ci', 'github actions', 'heroku', 'vercel', 'netlify',
   // Tools & Version Control
-  'git', 'github', 'gitlab', 'bitbucket', 'jira', 'vs code', 'linux', 'unix',
-  'bash', 'powershell', 'vim', 'emacs',
+  'git', 'github', 'gitlab', 'bitbucket', 'jira', 'vs code', 'visual studio code', 'intellij', 'linux', 'unix',
+  'bash', 'powershell', 'vim', 'emacs', 'postman', 'trello', 'slack',
   // Methodologies
-  'agile', 'scrum', 'kanban', 'devops', 'tdd', 'bdd',
+  'agile', 'scrum', 'kanban', 'devops', 'tdd', 'bdd', 'solid',
   // Design & UI/UX
   'figma', 'adobe xd', 'sketch', 'photoshop', 'illustrator', 'invision',
   // AI & Data Science
   'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'pandas', 'numpy',
-  'scikit-learn', 'keras', 'opencv', 'nlp', 'computer vision', 'data science',
+  'scikit-learn', 'keras', 'opencv', 'nlp', 'computer vision', 'data science', 'ml', 'ai',
   'big data', 'hadoop', 'spark', 'tableau', 'power bi',
   // Other Technologies
   'elasticsearch', 'rabbitmq', 'kafka', 'nginx', 'apache', 'microservices',
-  'serverless', 'websocket', 'oauth', 'jwt', 'soap', 'xml', 'json'
+  'serverless', 'websocket', 'oauth', 'jwt', 'soap', 'xml', 'json', 'iot'
 ];
 
-// Step 1: Extract text from PDF using multiple strategies
-function extractTextFromPDF(bytes: Uint8Array): string {
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  const pdfText = decoder.decode(bytes);
-  
-  let extractedText = '';
-  
-  // Strategy 1: Extract from stream objects
-  const streamRegex = /stream\s*([\s\S]*?)\s*endstream/g;
-  let match;
-  while ((match = streamRegex.exec(pdfText)) !== null) {
-    const streamContent = match[1];
-    const textInStream = streamContent
-      .replace(/[^\x20-\x7E\n@+\-()./]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    if (textInStream.length > 10) {
-      extractedText += textInStream + ' ';
-    }
-  }
-  
-  // Strategy 2: Extract text between parentheses
-  const parenRegex = /\(([^)]{2,})\)/g;
-  while ((match = parenRegex.exec(pdfText)) !== null) {
-    let text = match[1]
-      .replace(/\\n/g, ' ')
-      .replace(/\\r/g, ' ')
-      .replace(/\\t/g, ' ')
-      .replace(/\\\(/g, '(')
-      .replace(/\\\)/g, ')')
-      .replace(/\\\\/g, '\\')
-      .trim();
-    
-    if (text.length > 1 && /[a-zA-Z0-9@]/.test(text)) {
-      extractedText += text + ' ';
-    }
-  }
-  
-  // Strategy 3: Extract from TJ/Tj operators
-  const tjRegex = /\[(.*?)\]\s*TJ/g;
-  while ((match = tjRegex.exec(pdfText)) !== null) {
-    const text = match[1]
-      .replace(/[<>]/g, '')
-      .replace(/\\/g, '')
-      .trim();
-    
-    if (text.length > 1 && /[a-zA-Z0-9]/.test(text)) {
-      extractedText += text + ' ';
-    }
-  }
-  
-  // Clean up
-  extractedText = extractedText
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  return extractedText;
-}
-
-// Step 2: Advanced extraction functions
+// Advanced extraction functions
 function extractEmail(text: string): string[] {
   const matches = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
   return matches ? [...new Set(matches)] : [];
 }
 
 function extractPhones(text: string): string[] {
-  // Covers international formats including Oman
-  const matches = text.match(/(?:\+?968[-\s]?)?\b[279]\d{7}\b|(?:\+\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{3,4}[-\s]?\d{3,4}/g);
+  // Covers international formats including Oman (+968)
+  const matches = text.match(/(?:\+?968[-\s]?)?\b[279]\d{7,8}\b|(?:\+\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{3,4}[-\s]?\d{3,4}/g);
   return matches ? [...new Set(matches)] : [];
 }
 
@@ -124,7 +64,7 @@ function extractLinks(text: string): string[] {
   const unique = new Set(matches || []);
   // Filter for professional domains
   const professional = [...unique].filter(url => 
-    /(linkedin\.com|github\.com|portfolio|medium\.com|behance\.net|dribbble\.com|gitlab\.com|bitbucket\.org)/i.test(url)
+    /(linkedin\.com|github\.com|researchgate\.net|ijrar\.org|portfolio|medium\.com|behance\.net|dribbble\.com|gitlab\.com|bitbucket\.org)/i.test(url)
   );
   return professional.length > 0 ? professional : [...unique];
 }
@@ -135,7 +75,7 @@ function extractName(text: string): string {
     .map(l => l.trim())
     .filter(Boolean);
   
-  // Prefer lines with 2-4 capitalized words
+  // Prefer lines with 2-4 capitalized words (typical name format)
   const candidates = lines.filter(l => 
     /^[A-Z][a-z]+(?:\s+[A-Z][a-z'-]+){1,3}$/.test(l) &&
     l.length > 5 &&
@@ -151,10 +91,10 @@ function extractName(text: string): string {
     /^[A-Z][a-z]/.test(l) &&
     l.length > 3 &&
     l.length < 50 &&
-    !/^(curriculum|resume|cv|profile|about|contact)/i.test(l)
+    !/^(curriculum|resume|cv|profile|about|contact|education|experience|skills)/i.test(l)
   );
   
-  return fallback || lines[0] || '';
+  return fallback || '';
 }
 
 function extractSkills(text: string): string[] {
@@ -178,14 +118,14 @@ function extractSkills(text: string): string[] {
   return [...foundSkills];
 }
 
-// Step 3: OCR fallback using Gemini Vision
-async function ocrWithGemini(arrayBuffer: ArrayBuffer): Promise<string> {
+// Use Gemini to extract text from PDF (treating as document, not image)
+async function extractTextWithGemini(arrayBuffer: ArrayBuffer): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) {
     throw new Error('LOVABLE_API_KEY not configured');
   }
 
-  // Convert to base64
+  // Convert to base64 in chunks to avoid memory issues
   const bytes = new Uint8Array(arrayBuffer);
   let binary = '';
   const chunkSize = 8192;
@@ -195,7 +135,7 @@ async function ocrWithGemini(arrayBuffer: ArrayBuffer): Promise<string> {
   }
   const base64Pdf = btoa(binary);
 
-  console.log('Using Gemini Vision for OCR...');
+  console.log('Using Gemini to extract text from PDF...');
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -211,7 +151,14 @@ async function ocrWithGemini(arrayBuffer: ArrayBuffer): Promise<string> {
           content: [
             {
               type: 'text',
-              text: 'Extract ALL text from this document. Return only the raw text content, preserving line breaks. Do not add any commentary or formatting.'
+              text: `Extract ALL text from this CV/Resume document. Return the complete text content exactly as it appears, preserving:
+- Names, contact information (email, phone)
+- All sections (Education, Experience, Projects, Skills, etc.)
+- Dates and locations
+- Bullet points and descriptions
+- Links and URLs
+
+Return ONLY the extracted text, no commentary or formatting instructions.`
             },
             {
               type: 'image_url',
@@ -226,7 +173,9 @@ async function ocrWithGemini(arrayBuffer: ArrayBuffer): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`Gemini OCR failed: ${response.status}`);
+    const errorText = await response.text();
+    console.error('Gemini extraction error:', response.status, errorText);
+    throw new Error(`Gemini extraction failed: ${response.status}`);
   }
 
   const data = await response.json();
@@ -250,52 +199,25 @@ serve(async (req) => {
     console.log('File received:', file.name, 'Size:', file.size);
 
     const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
     
-    // Step 1: Try text extraction
-    console.log('Attempting text extraction...');
-    let extractedText = extractTextFromPDF(bytes);
+    // Try Gemini-based text extraction directly
+    console.log('Extracting text with Gemini Vision...');
+    let extractedText = '';
     
-    console.log('Extracted text length:', extractedText.length);
-    console.log('Text preview:', extractedText.slice(0, 300));
-    
-    // Step 2: Detect if text is valid or if OCR is needed
-    const cleanText = extractedText.replace(/\s+/g, '');
-    
-    // Check if text is readable: at least 30% should be alphanumeric
-    const alphanumericCount = (extractedText.match(/[a-zA-Z0-9]/g) || []).length;
-    const totalChars = extractedText.length;
-    const readabilityRatio = totalChars > 0 ? alphanumericCount / totalChars : 0;
-    
-    // Check for common readable patterns
-    const hasValidEmail = /@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(extractedText);
-    const hasValidWords = /\b[a-zA-Z]{4,}\b/.test(extractedText); // At least one 4+ letter word
-    const hasExcessiveSpecialChars = (extractedText.match(/[^a-zA-Z0-9\s@.+\-()]/g) || []).length / totalChars > 0.4;
-    
-    const needsOCR = !extractedText || 
-                     cleanText.length < 50 || 
-                     readabilityRatio < 0.4 ||
-                     !hasValidWords ||
-                     hasExcessiveSpecialChars;
-    
-    console.log('Readability ratio:', readabilityRatio.toFixed(2));
-    console.log('Has valid email:', hasValidEmail);
-    console.log('Has valid words:', hasValidWords);
-    console.log('Excessive special chars:', hasExcessiveSpecialChars);
-    console.log('Needs OCR:', needsOCR);
-    
-    if (needsOCR) {
-      console.log('Text extraction insufficient, using OCR fallback...');
-      extractedText = await ocrWithGemini(arrayBuffer);
-      console.log('OCR result length:', extractedText.length);
-      console.log('OCR preview:', extractedText.slice(0, 300));
+    try {
+      extractedText = await extractTextWithGemini(arrayBuffer);
+      console.log('Gemini extraction successful, length:', extractedText.length);
+      console.log('Text preview:', extractedText.slice(0, 500));
+    } catch (geminiError) {
+      console.error('Gemini extraction failed:', geminiError);
+      throw new Error('Failed to extract text from PDF. Please ensure the PDF is readable.');
     }
     
     if (!extractedText || extractedText.trim().length < 20) {
-      throw new Error('Could not extract text from PDF');
+      throw new Error('Could not extract sufficient text from PDF');
     }
 
-    // Step 3: Apply robust heuristics
+    // Apply robust heuristics
     console.log('Applying extraction heuristics...');
     
     const emails = extractEmail(extractedText);
