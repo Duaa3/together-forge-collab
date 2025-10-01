@@ -194,13 +194,12 @@ const CreateJobDialog = ({ open, onOpenChange, onJobCreated, userId }: CreateJob
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Job Description</Label>
+            <Label htmlFor="description">Job Description (Optional)</Label>
             <Textarea
               id="description"
               placeholder="Describe the role, responsibilities, and requirements..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              required
               rows={6}
               className="resize-none"
             />
