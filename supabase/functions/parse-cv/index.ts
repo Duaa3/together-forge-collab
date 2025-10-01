@@ -30,27 +30,47 @@ serve(async (req) => {
 
     console.log('File received:', file.name, 'Size:', file.size);
 
-    // Extract text from PDF
+    // Extract text from PDF with advanced pattern matching
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
     
-    // Simple but effective: extract all text between parentheses (PDF text format)
-    // and between text markers, then let AI sort it out
+    console.log('Extracting text from PDF...');
+    
+    // Try multiple extraction strategies
     const decoder = new TextDecoder('utf-8', { fatal: false });
     const pdfText = decoder.decode(bytes);
     
-    console.log('Extracting text from PDF...');
-    
-    // Extract text in parentheses (most common PDF text format)
-    const textMatches = pdfText.match(/\(([^)]+)\)/g) || [];
-    let extractedText = textMatches
+    // Strategy 1: Extract text between parentheses (most common)
+    const parenMatches = pdfText.match(/\(([^)]+)\)/g) || [];
+    let extractedText = parenMatches
       .map(m => m.slice(1, -1))
       .join(' ')
       .replace(/\\[nrt]/g, ' ')
+      .replace(/\\\(/g, '(')
+      .replace(/\\\)/g, ')')
       .replace(/\s+/g, ' ');
+    
+    // Strategy 2: Also extract text after "Tj" and "TJ" operators (common in PDFs)
+    const tjMatches = pdfText.match(/\[(.*?)\]\s*TJ/g) || [];
+    const tjText = tjMatches
+      .map(m => m.replace(/[\[\]]/g, '').replace(/TJ/g, ''))
+      .join(' ')
+      .replace(/\s+/g, ' ');
+    
+    extractedText = (extractedText + ' ' + tjText).trim();
+    
+    // Strategy 3: Try to find plain text sequences (fallback)
+    if (extractedText.length < 100) {
+      const plainTextMatches = pdfText.match(/[a-zA-Z0-9@.+\-\s]{10,}/g) || [];
+      extractedText = plainTextMatches.join(' ').replace(/\s+/g, ' ');
+    }
     
     console.log('Extracted text preview:', extractedText.slice(0, 500));
     console.log('Total extracted length:', extractedText.length);
+    
+    if (!extractedText || extractedText.trim().length < 50) {
+      throw new Error('Could not extract meaningful text from PDF. The PDF may be image-based or use unsupported encoding.');
+    }
 
     // Use Lovable AI to intelligently extract structured information
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
