@@ -145,19 +145,23 @@ serve(async (req) => {
     // Advanced text cleaning and preprocessing
     console.log('Applying advanced text cleaning...');
     
-    // Remove common PDF artifacts
+    // Remove common PDF artifacts and noise
     textContent = textContent
-      .replace(/obj\s*<<\s*\/Type/g, ' ')           // PDF objects
-      .replace(/\/[A-Z][a-z]+\s+/g, ' ')            // PDF commands
-      .replace(/\d+\s+\d+\s+obj/g, ' ')             // Object references
+      .replace(/obj\s*<<\s*\/Type/g, ' ')
+      .replace(/\/[A-Z][a-z]+\s+/g, ' ')
+      .replace(/\d+\s+\d+\s+obj/g, ' ')
       .replace(/endobj/g, ' ')
       .replace(/stream|endstream/g, ' ')
       .replace(/startxref/g, ' ')
       .replace(/xref/g, ' ')
       .replace(/%%EOF/g, ' ')
-      .replace(/\[(\s*\d+\s*)+\]/g, ' ')           // Number arrays
-      .replace(/[<>]{2,}/g, ' ')                    // Multiple brackets
-      .replace(/\d{10,}/g, ' ')                     // Very long numbers
+      .replace(/\[(\s*\d+\s*)+\]/g, ' ')
+      .replace(/[<>]{2,}/g, ' ')
+      .replace(/\d{10,}/g, ' ')
+      .replace(/[^\x20-\x7E\s]/g, ' ')  // Remove non-printable ASCII
+      .replace(/\b[a-zA-Z]{1,2}\b/g, ' ')  // Remove 1-2 letter words (likely noise)
+      .replace(/[|\\\/\[\]{}@#$%^&*<>]/g, ' ')  // Remove special chars that are PDF artifacts
+      .replace(/\s+/g, ' ')
       .trim();
     
     // Extract text near common CV section headers
@@ -184,27 +188,31 @@ serve(async (req) => {
       console.log('Enhanced with section-based extraction:', sectionText.length, 'chars');
     }
     
-    // Extract potential skills using common patterns
+    // Extract potential skills only from relevant sections
     const skillPatterns = [
-      /\b(?:Python|Java|JavaScript|TypeScript|C\+\+|C#|PHP|Ruby|Go|Rust|Swift|Kotlin)\b/gi,
-      /\b(?:React|Angular|Vue|Django|Flask|Spring|Node\.js|Express|FastAPI)\b/gi,
-      /\b(?:SQL|MySQL|PostgreSQL|MongoDB|Redis|Oracle|Firebase|Supabase)\b/gi,
-      /\b(?:AWS|Azure|GCP|Docker|Kubernetes|Jenkins|Git|GitHub|GitLab)\b/gi,
-      /\b(?:Machine Learning|AI|Data Analysis|Data Science|Deep Learning)\b/gi,
-      /\b(?:Communication|Leadership|Teamwork|Problem[\s-]solving|Analytical)\b/gi,
+      /\b(?:Python|Java|JavaScript|TypeScript|C\+\+|C#|PHP|Ruby|Go|Rust|Swift|Kotlin)\b/g,
+      /\b(?:React|Angular|Vue|Django|Flask|Spring|Node\.js|Express|FastAPI)\b/g,
+      /\b(?:SQL|MySQL|PostgreSQL|MongoDB|Redis|Oracle|Firebase|Supabase)\b/g,
+      /\b(?:AWS|Azure|GCP|Docker|Kubernetes|Jenkins|Git|GitHub|GitLab)\b/g,
+      /\b(?:Machine Learning|Data Analysis|Data Science|Deep Learning)\b/g,
     ];
     
-    const foundSkills: string[] = [];
-    for (const pattern of skillPatterns) {
-      const matches = textContent.match(pattern);
-      if (matches) {
-        foundSkills.push(...matches);
+    const foundSkills = new Set<string>();
+    
+    // Only extract from section text to avoid noise
+    if (sectionText) {
+      for (const pattern of skillPatterns) {
+        const matches = sectionText.match(pattern);
+        if (matches) {
+          matches.forEach(skill => foundSkills.add(skill));
+        }
       }
     }
     
-    if (foundSkills.length > 0) {
-      console.log('Pre-extracted skills:', foundSkills.join(', '));
-      textContent = `DETECTED SKILLS: ${foundSkills.join(', ')}\n\n` + textContent;
+    if (foundSkills.size > 0) {
+      const skillsArray = Array.from(foundSkills);
+      console.log('Pre-extracted skills:', skillsArray.join(', '));
+      textContent = `VERIFIED SKILLS FROM CV: ${skillsArray.join(', ')}\n\n` + textContent;
     }
     
     console.log('Final cleaned text length:', textContent.length);
@@ -226,56 +234,54 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an AGGRESSIVE CV parser. Your job is to extract EVERY piece of information from messy CV text.
+            content: `You are a PRECISE CV parser. Extract ONLY legitimate information that appears in the CV context.
 
-EXTRACTION PRIORITY:
-1. NAME: Look for ANY capitalized words that could be a name (First Last, or full name format). Check:
-   - Top of document
-   - After words like "CV", "Resume", "Name", "Curriculum Vitae"
-   - Any line with 2-3 capitalized words in sequence
+CRITICAL RULES:
+1. NAME: Extract the full name ONLY if it appears at the top of the CV or in a clear name field. Look for:
+   - Names near "CV", "Resume", or at document start
+   - Format: First Middle Last or First Last
+   - Ignore random capitalized words
 
-2. EMAIL: Find ANY text with @ symbol and domain extension (.com, .net, etc.)
+2. EMAIL: Extract ONLY valid email addresses with @ and proper domain (.com, .org, etc.)
 
-3. PHONE: Find ANY number sequence that looks like a phone:
-   - With + and country code
-   - 10+ digits with dashes, spaces, parentheses
-   - Format: +XXX XXXXXXXXXX or (XXX) XXX-XXXX
+3. PHONE: Extract phone numbers that follow standard formats:
+   - International: +XX XXX XXX XXXX
+   - Local formats with area codes
+   - Must have at least 10 digits
 
-4. LINKS: Extract ANY URLs or web addresses:
-   - Full URLs (https://, http://)
-   - Domain names (linkedin.com/in/..., github.com/...)
-   - Even partial URLs
+4. LINKS: Extract ONLY complete URLs:
+   - LinkedIn profiles (linkedin.com/in/...)
+   - GitHub profiles (github.com/...)
+   - Portfolio websites
+   - Professional social media
 
-5. SKILLS (MOST IMPORTANT): Extract EVERYTHING that could be a skill:
-   - Programming: Python, Java, JavaScript, C++, C#, PHP, Ruby, Go, Rust, etc.
-   - Frameworks: React, Angular, Vue, Django, Flask, Spring, .NET, etc.
-   - Databases: SQL, MySQL, PostgreSQL, MongoDB, Redis, Oracle, etc.
-   - Cloud: AWS, Azure, GCP, Docker, Kubernetes, etc.
-   - Tools: Git, JIRA, Excel, Office, Photoshop, etc.
-   - Soft skills: Communication, Leadership, Teamwork, Problem-solving, etc.
-   - Certifications: AWS Certified, PMP, CISSP, etc.
-   - Domain knowledge: Machine Learning, AI, Data Analysis, Security, etc.
+5. SKILLS (CRITICAL - BE SELECTIVE):
+   - Extract ONLY skills mentioned in "Skills", "Technical Skills", "Experience", "Projects" sections
+   - Programming languages: Python, Java, JavaScript, etc.
+   - Frameworks: React, Angular, Django, etc.
+   - Databases: SQL, PostgreSQL, MongoDB, etc.
+   - Cloud/DevOps: AWS, Docker, Kubernetes, etc.
+   - IGNORE: PDF artifacts, random words, partial words, special characters
+   - IGNORE: Anything under 3 characters unless it's a well-known acronym (SQL, AWS, Git)
+   - NO DUPLICATES: Return each unique skill once
 
-RULES:
-- Be EXTREMELY liberal with skill extraction
-- Include ANY technical term or tool mentioned
-- Include soft skills and personal qualities
-- Don't worry about duplicates - extract everything
-- If text is garbled, extract individual recognizable words
-- NEVER return empty arrays for skills unless absolutely nothing technical is mentioned
-- Prioritize finding SOMETHING over finding nothing`
+VALIDATION:
+- If something looks like noise or PDF artifact, DO NOT extract it
+- Skills must be real technology names, not random text
+- Return empty arrays if you cannot find legitimate information
+- Quality over quantity - only extract what you're confident about`
           },
           {
             role: 'user',
-            content: `EXTRACT EVERYTHING from this CV. Look for:
-- ANY capitalized name (first name, last name, full name)
-- ANY email address with @ symbol
-- ANY phone number (with +, -, spaces, parentheses)
-- ANY URLs or social media links
-- EVERY SINGLE skill, tool, technology, programming language, framework, database, certification, or competency mentioned
+            content: `Extract information from this CV. Be selective and only extract legitimate data:
 
-The text below may contain pre-extracted skills at the top. Use those AND find more:
+IMPORTANT: 
+- The text may contain pre-verified skills at the top - prioritize those
+- Only extract skills that appear in proper context (skills section, work experience, projects)
+- Ignore PDF artifacts, random characters, and noise
+- Remove duplicates
 
+CV Text:
 ${textContent.slice(0, 35000)}`
           }
         ],
@@ -327,6 +333,27 @@ ${textContent.slice(0, 35000)}`
       parsedCV = typeof args === 'string' ? JSON.parse(args) : args;
     } else {
       throw new Error('No tool call response from AI');
+    }
+
+    // Post-process and clean the extracted data
+    // Remove duplicate skills and filter out noise
+    if (parsedCV.skills && Array.isArray(parsedCV.skills)) {
+      const cleanedSkills = new Set<string>();
+      
+      parsedCV.skills.forEach((skill: string) => {
+        // Filter out obvious garbage
+        if (skill && 
+            skill.length >= 2 &&  // At least 2 chars
+            !/^[^a-zA-Z0-9]+$/.test(skill) &&  // Not just special chars
+            !/[|\\\/\[\]{}@#$%^&*<>]/.test(skill) &&  // No PDF artifacts
+            skill !== 'ai' &&  // Filter generic/noise
+            skill !== 'AI') {
+          // Normalize and add
+          cleanedSkills.add(skill.trim());
+        }
+      });
+      
+      parsedCV.skills = Array.from(cleanedSkills);
     }
 
     console.log('Successfully parsed CV:', parsedCV);
