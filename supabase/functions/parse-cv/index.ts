@@ -259,9 +259,25 @@ serve(async (req) => {
     console.log('Extracted text length:', extractedText.length);
     console.log('Text preview:', extractedText.slice(0, 300));
     
-    // Step 2: Detect if OCR is needed
+    // Step 2: Detect if text is valid or if OCR is needed
     const cleanText = extractedText.replace(/\s+/g, '');
-    const needsOCR = !extractedText || cleanText.length < 50;
+    
+    // Check if text is readable: at least 30% should be alphanumeric
+    const alphanumericCount = (extractedText.match(/[a-zA-Z0-9]/g) || []).length;
+    const readabilityRatio = extractedText.length > 0 ? alphanumericCount / extractedText.length : 0;
+    
+    // Also check for common readable words
+    const commonWords = ['the', 'and', 'for', 'with', 'experience', 'skill', 'work', 'project', 'education'];
+    const hasCommonWords = commonWords.some(word => extractedText.toLowerCase().includes(word));
+    
+    const needsOCR = !extractedText || 
+                     cleanText.length < 50 || 
+                     readabilityRatio < 0.3 || 
+                     !hasCommonWords;
+    
+    console.log('Readability ratio:', readabilityRatio.toFixed(2));
+    console.log('Has common words:', hasCommonWords);
+    console.log('Needs OCR:', needsOCR);
     
     if (needsOCR) {
       console.log('Text extraction insufficient, using OCR fallback...');
@@ -290,6 +306,18 @@ serve(async (req) => {
       links: links,
       skills: skills
     };
+    
+    // Validate the extracted name - reject if it's garbage
+    if (parsedCV.name && parsedCV.name !== 'Unknown Candidate') {
+      const nameAlphanumeric = (parsedCV.name.match(/[a-zA-Z]/g) || []).length;
+      const nameRatio = nameAlphanumeric / parsedCV.name.length;
+      
+      // Name should be at least 60% letters and less than 100 characters
+      if (nameRatio < 0.6 || parsedCV.name.length > 100) {
+        console.log('Invalid name detected, resetting:', parsedCV.name.slice(0, 50));
+        parsedCV.name = 'Unknown Candidate';
+      }
+    }
 
     console.log('Successfully parsed CV:', parsedCV);
 
