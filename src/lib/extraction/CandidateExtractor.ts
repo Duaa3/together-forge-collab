@@ -70,24 +70,16 @@ export class CandidateExtractor {
    * Extract candidate name (usually at the top of the CV)
    */
   private static extractName(text: string): string {
-    // Strategy 1: Look for name in first few lines
-    const lines = text.split('\n').slice(0, 5);
+    const lines = text.split('\n');
     
-    for (const line of lines) {
-      const trimmed = line.trim();
+    // Pass 1: Strict matching (first 10 lines, proper capitalization)
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
+      const trimmed = lines[i].trim();
       
-      // Skip empty lines, emails, phones, and URLs
-      if (!trimmed || 
-          this.EMAIL_REGEX.test(trimmed) || 
-          this.PHONE_REGEX.test(trimmed) ||
-          /https?:\/\//.test(trimmed)) {
-        continue;
-      }
-
-      // Look for a line with 2-4 words (typical name format)
+      if (!trimmed || this.isContactInfo(trimmed)) continue;
+      
       const words = trimmed.split(/\s+/);
-      if (words.length >= 2 && words.length <= 4) {
-        // Check if it looks like a name (capitalized words)
+      if (words.length >= 2 && words.length <= 6) {
         const looksLikeName = words.every(word => 
           word.length > 1 && /^[A-Z]/.test(word)
         );
@@ -97,8 +89,71 @@ export class CandidateExtractor {
         }
       }
     }
+    
+    // Pass 2: Relaxed matching (first 15 lines, case-insensitive with particles)
+    for (let i = 0; i < Math.min(15, lines.length); i++) {
+      const trimmed = lines[i].trim();
+      
+      if (!trimmed || this.isContactInfo(trimmed)) continue;
+      
+      const words = trimmed.split(/\s+/);
+      if (words.length >= 1 && words.length <= 6) {
+        // Handle international names with particles (Al, El, van, de, etc.)
+        const particles = ['al', 'el', 'van', 'de', 'del', 'bin', 'ibn', 'von', 'da'];
+        const hasValidStructure = words.some(word => 
+          (word.length > 1 && /^[A-Z]/.test(word)) || particles.includes(word.toLowerCase())
+        );
+        
+        if (hasValidStructure && !this.containsCommonWords(trimmed)) {
+          return this.capitalizeWords(trimmed);
+        }
+      }
+    }
+    
+    // Pass 3: Look near contact information
+    for (let i = 0; i < Math.min(20, lines.length); i++) {
+      if (this.EMAIL_REGEX.test(lines[i]) || this.PHONE_REGEX.test(lines[i])) {
+        // Check 2 lines before contact info
+        for (let j = Math.max(0, i - 2); j < i; j++) {
+          const trimmed = lines[j].trim();
+          if (trimmed && !this.isContactInfo(trimmed)) {
+            const words = trimmed.split(/\s+/);
+            if (words.length >= 2 && words.length <= 6) {
+              return this.capitalizeWords(trimmed);
+            }
+          }
+        }
+      }
+    }
 
     return 'Unknown';
+  }
+
+  /**
+   * Check if line contains contact information
+   */
+  private static isContactInfo(text: string): boolean {
+    return this.EMAIL_REGEX.test(text) || 
+           this.PHONE_REGEX.test(text) ||
+           /https?:\/\//.test(text);
+  }
+
+  /**
+   * Check if text contains common CV words (not a name)
+   */
+  private static containsCommonWords(text: string): boolean {
+    const commonWords = ['curriculum', 'vitae', 'resume', 'cv', 'profile', 'summary', 'objective'];
+    const lowerText = text.toLowerCase();
+    return commonWords.some(word => lowerText.includes(word));
+  }
+
+  /**
+   * Capitalize first letter of each word
+   */
+  private static capitalizeWords(text: string): string {
+    return text.split(/\s+/).map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
   }
 
   /**
