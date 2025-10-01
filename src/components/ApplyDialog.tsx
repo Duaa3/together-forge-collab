@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, FileText } from "lucide-react";
+import { PdfProcessor } from "@/lib/pdf/PdfProcessor";
+import { CandidateExtractor } from "@/lib/extraction/CandidateExtractor";
 
 interface ApplyDialogProps {
   jobId: string;
@@ -47,44 +49,36 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
     try {
       // Step 1: PDF Loading
       setExtractionSteps(prev => ({ ...prev, pdfLoading: true }));
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Parse CV using edge function
-      const formData = new FormData();
-      formData.append('file', file);
-
+      
+      // Create PDF processor
+      const processor = new PdfProcessor();
+      const text = await processor.extractText(file);
+      
       // Step 2: RegEx Processing
       setExtractionSteps(prev => ({ ...prev, regexProcessing: true }));
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Step 3: NLP Extraction
+      // Step 3: Data Extraction
       setExtractionSteps(prev => ({ ...prev, nlpExtraction: true }));
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-cv`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to parse CV');
-      }
-
-      const data = await response.json();
+      const candidateData = CandidateExtractor.extract(text);
       
       // Step 4: Data Validation
       setExtractionSteps(prev => ({ ...prev, dataValidation: true }));
       await new Promise(resolve => setTimeout(resolve, 300));
       
       // Store parsed data for submission
-      setParsedData(data);
+      setParsedData({
+        skills: candidateData.skills,
+        links: {
+          github: candidateData.links.github,
+          linkedin: candidateData.links.linkedin
+        }
+      });
       
       // Auto-fill form with extracted data
-      if (data.name) setName(data.name);
-      if (data.email) setEmail(data.email);
-      if (data.phone) setPhone(data.phone);
+      if (candidateData.name) setName(candidateData.name);
+      if (candidateData.email) setEmail(candidateData.email);
+      if (candidateData.phone) setPhone(candidateData.phone);
 
       toast({
         title: "Success",
@@ -137,8 +131,8 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
       if (uploadError) throw uploadError;
 
       // Extract github and linkedin from parsed data
-      const github = parsedData?.links?.find((link: string) => link.includes('github')) || null;
-      const linkedin = parsedData?.links?.find((link: string) => link.includes('linkedin')) || null;
+      const github = parsedData?.links?.github || null;
+      const linkedin = parsedData?.links?.linkedin || null;
 
       // Insert candidate record with CV path and parsed data
       const { error } = await supabase.from("candidates").insert({
@@ -263,7 +257,7 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
                   
                   <div className={`flex items-center gap-2 text-sm ${extractionSteps.nlpExtraction ? 'text-primary' : 'text-muted-foreground'}`}>
                     <div className={`w-2 h-2 rounded-full ${extractionSteps.nlpExtraction ? 'bg-primary animate-pulse' : 'bg-muted'}`} />
-                    <span>AI/NLP Model - Extracting Name, Contact, Skills</span>
+                    <span>Pattern Matching - Extracting Name, Contact, Skills</span>
                     {extractionSteps.nlpExtraction && <span className="ml-auto text-xs">✓</span>}
                   </div>
                   

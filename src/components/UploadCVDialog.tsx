@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, X } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { PdfProcessor, PdfProcessingProgress } from "@/lib/pdf/PdfProcessor";
+import { CandidateExtractor } from "@/lib/extraction/CandidateExtractor";
 
 type Job = Database["public"]["Tables"]["jobs"]["Row"];
 
@@ -19,6 +21,7 @@ interface UploadCVDialogProps {
 const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: UploadCVDialogProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<PdfProcessingProgress | null>(null);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,39 +36,32 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
 
   const extractCandidateInfo = async (file: File) => {
     try {
-      console.log(`Parsing CV: ${file.name}`);
+      console.log(`Processing CV: ${file.name}`);
       
-      // Use AI edge function for extraction
-      const formData = new FormData();
-      formData.append('file', file);
+      // Create PDF processor with progress callback
+      const processor = new PdfProcessor((progress) => {
+        setProcessingProgress(progress);
+      });
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-cv`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      // Extract text from PDF using client-side processing
+      const text = await processor.extractText(file);
+      console.log(`Extracted ${text.length} characters from ${file.name}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to parse CV');
-      }
-
-      const data = await response.json();
-      console.log(`Successfully parsed ${file.name}:`, data);
+      // Extract candidate information from text
+      const candidateData = CandidateExtractor.extract(text);
+      console.log(`Successfully extracted data from ${file.name}:`, candidateData);
       
       return {
-        name: data.name || 'Unknown Candidate',
-        email: data.email || null,
-        phone: data.phone || null,
-        github: data.links?.find((l: string) => l.includes('github')) || null,
-        linkedin: data.links?.find((l: string) => l.includes('linkedin')) || null,
-        extractedSkills: data.extractedSkills || []
+        name: candidateData.name,
+        email: candidateData.email || null,
+        phone: candidateData.phone || null,
+        github: candidateData.links.github || null,
+        linkedin: candidateData.links.linkedin || null,
+        extractedSkills: candidateData.skills
       };
     } catch (error) {
-      console.error(`Error parsing ${file.name}:`, error);
-      // For fallback, we cannot reliably extract from binary PDF on client side
-      // Return minimal placeholder data
+      console.error(`Error processing ${file.name}:`, error);
+      // Fallback to filename-based data
       return {
         name: file.name.replace(/\.(pdf|doc|docx|txt)$/i, ''),
         email: null,
@@ -74,6 +70,8 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
         linkedin: null,
         extractedSkills: []
       };
+    } finally {
+      setProcessingProgress(null);
     }
   };
 
@@ -246,6 +244,18 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
                   </Button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {processingProgress && (
+            <div className="p-4 bg-accent/50 rounded-lg border space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Processing CV...</span>
+                <span className="text-xs text-muted-foreground">
+                  {processingProgress.stage === 'complete' ? '✓' : `${processingProgress.pagesCurrent}/${processingProgress.pagesTotal}`}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">{processingProgress.message}</p>
             </div>
           )}
 
