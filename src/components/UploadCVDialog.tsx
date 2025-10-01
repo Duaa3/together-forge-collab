@@ -64,15 +64,12 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
       };
     } catch (error) {
       console.error(`Error parsing ${file.name}:`, error);
-      // Fallback to basic extraction
-      const text = await file.text();
-      const emailRegex = /[\w.-]+@[\w.-]+\.\w+/;
-      const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
-
+      // For fallback, we cannot reliably extract from binary PDF on client side
+      // Return minimal placeholder data
       return {
-        name: 'Unknown Candidate',
-        email: text.match(emailRegex)?.[0] || null,
-        phone: text.match(phoneRegex)?.[0] || null,
+        name: file.name.replace(/\.(pdf|doc|docx|txt)$/i, ''),
+        email: null,
+        phone: null,
         github: null,
         linkedin: null,
         extractedSkills: []
