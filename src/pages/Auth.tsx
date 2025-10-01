@@ -12,6 +12,7 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"hr" | "candidate">("candidate");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -45,7 +46,7 @@ const Auth = () => {
         navigate("/");
       } else {
         const redirectUrl = `${window.location.origin}/`;
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -54,6 +55,15 @@ const Auth = () => {
         });
         
         if (error) throw error;
+        
+        // Insert user role
+        if (data.user) {
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .insert({ user_id: data.user.id, role });
+          
+          if (roleError) throw roleError;
+        }
         
         toast({
           title: "Account created!",
@@ -109,6 +119,21 @@ const Auth = () => {
                 minLength={6}
               />
             </div>
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="role">I am a</Label>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as "hr" | "candidate")}
+                  className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                  required
+                >
+                  <option value="candidate">Job Candidate</option>
+                  <option value="hr">HR Manager</option>
+                </select>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
             </Button>
