@@ -127,8 +127,15 @@ async function extractCVDataWithAI(arrayBuffer: ArrayBuffer): Promise<ParsedCV> 
     throw new Error('LOVABLE_API_KEY is not configured');
   }
 
-  // Convert PDF to base64
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+  // Convert PDF to base64 efficiently (handle large files by chunking)
+  const uint8Array = new Uint8Array(arrayBuffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < uint8Array.length; i += chunkSize) {
+    const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  const base64 = btoa(binary);
   
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -145,7 +152,24 @@ async function extractCVDataWithAI(arrayBuffer: ArrayBuffer): Promise<ParsedCV> 
             content: [
               {
                 type: 'text',
-                text: 'Extract the candidate information from this CV/Resume PDF. Extract: full name, email address, phone number, professional links (LinkedIn, GitHub, portfolio, etc.), and technical skills.'
+                text: `Extract ALL information from this CV/Resume PDF with high accuracy. 
+
+CRITICAL INSTRUCTIONS:
+- Extract the candidate's FULL NAME exactly as it appears (first and last name)
+- Extract ALL email addresses found in the document
+- Extract ALL phone numbers in their original format
+- Extract ALL professional links (LinkedIn, GitHub, portfolio websites, ResearchGate, etc.)
+- Extract ALL technical skills, programming languages, frameworks, tools, and technologies mentioned
+- Look for skills in sections like: Skills, Technical Skills, Technologies, Tools, Competencies, etc.
+- Include both explicitly listed skills AND skills mentioned in project descriptions or work experience
+- Be thorough - extract EVERY skill mentioned throughout the entire document
+
+Return structured data with:
+- name: Full name of candidate
+- email: Primary email address
+- phone: Phone number with country code if available
+- links: Array of ALL professional URLs found
+- skills: Array of ALL technical skills, tools, and technologies (be comprehensive)`
               },
               {
                 type: 'image_url',
