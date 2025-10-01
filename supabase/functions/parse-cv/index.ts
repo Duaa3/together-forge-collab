@@ -14,14 +14,223 @@ interface ParsedCV {
   skills: string[];
 }
 
-// Convert PDF to base64 for image analysis
-async function pdfToBase64(arrayBuffer: ArrayBuffer): Promise<string> {
+// Comprehensive skills dictionary
+const SKILLS_DICT = [
+  // Programming Languages
+  'javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'ruby', 'go', 'rust',
+  'swift', 'kotlin', 'php', 'scala', 'r', 'perl', 'dart', 'objective-c', 'c',
+  // Frontend
+  'react', 'angular', 'vue', 'svelte', 'next.js', 'nuxt.js', 'jquery', 'bootstrap',
+  'tailwind', 'html', 'css', 'sass', 'less', 'webpack', 'vite', 'redux', 'mobx',
+  // Backend
+  'node.js', 'express', 'django', 'flask', 'spring', 'spring boot', '.net', 'fastapi',
+  'laravel', 'ruby on rails', 'asp.net', 'graphql', 'rest', 'api', 'nestjs',
+  // Databases
+  'postgresql', 'mysql', 'mongodb', 'redis', 'oracle', 'sql server', 'supabase',
+  'firebase', 'dynamodb', 'cassandra', 'sqlite', 'mariadb', 'sql', 'nosql',
+  // Cloud & DevOps
+  'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins', 'ci/cd', 'terraform',
+  'ansible', 'circleci', 'gitlab ci', 'github actions', 'heroku', 'vercel', 'netlify',
+  // Tools & Version Control
+  'git', 'github', 'gitlab', 'bitbucket', 'jira', 'vs code', 'linux', 'unix',
+  'bash', 'powershell', 'vim', 'emacs',
+  // Methodologies
+  'agile', 'scrum', 'kanban', 'devops', 'tdd', 'bdd',
+  // Design & UI/UX
+  'figma', 'adobe xd', 'sketch', 'photoshop', 'illustrator', 'invision',
+  // AI & Data Science
+  'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'pandas', 'numpy',
+  'scikit-learn', 'keras', 'opencv', 'nlp', 'computer vision', 'data science',
+  'big data', 'hadoop', 'spark', 'tableau', 'power bi',
+  // Other Technologies
+  'elasticsearch', 'rabbitmq', 'kafka', 'nginx', 'apache', 'microservices',
+  'serverless', 'websocket', 'oauth', 'jwt', 'soap', 'xml', 'json'
+];
+
+// Step 1: Extract text from PDF using multiple strategies
+function extractTextFromPDF(bytes: Uint8Array): string {
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const pdfText = decoder.decode(bytes);
+  
+  let extractedText = '';
+  
+  // Strategy 1: Extract from stream objects
+  const streamRegex = /stream\s*([\s\S]*?)\s*endstream/g;
+  let match;
+  while ((match = streamRegex.exec(pdfText)) !== null) {
+    const streamContent = match[1];
+    const textInStream = streamContent
+      .replace(/[^\x20-\x7E\n@+\-()./]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    if (textInStream.length > 10) {
+      extractedText += textInStream + ' ';
+    }
+  }
+  
+  // Strategy 2: Extract text between parentheses
+  const parenRegex = /\(([^)]{2,})\)/g;
+  while ((match = parenRegex.exec(pdfText)) !== null) {
+    let text = match[1]
+      .replace(/\\n/g, ' ')
+      .replace(/\\r/g, ' ')
+      .replace(/\\t/g, ' ')
+      .replace(/\\\(/g, '(')
+      .replace(/\\\)/g, ')')
+      .replace(/\\\\/g, '\\')
+      .trim();
+    
+    if (text.length > 1 && /[a-zA-Z0-9@]/.test(text)) {
+      extractedText += text + ' ';
+    }
+  }
+  
+  // Strategy 3: Extract from TJ/Tj operators
+  const tjRegex = /\[(.*?)\]\s*TJ/g;
+  while ((match = tjRegex.exec(pdfText)) !== null) {
+    const text = match[1]
+      .replace(/[<>]/g, '')
+      .replace(/\\/g, '')
+      .trim();
+    
+    if (text.length > 1 && /[a-zA-Z0-9]/.test(text)) {
+      extractedText += text + ' ';
+    }
+  }
+  
+  // Clean up
+  extractedText = extractedText
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  return extractedText;
+}
+
+// Step 2: Advanced extraction functions
+function extractEmail(text: string): string[] {
+  const matches = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+  return matches ? [...new Set(matches)] : [];
+}
+
+function extractPhones(text: string): string[] {
+  // Covers international formats including Oman
+  const matches = text.match(/(?:\+?968[-\s]?)?\b[279]\d{7}\b|(?:\+\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{3,4}[-\s]?\d{3,4}/g);
+  return matches ? [...new Set(matches)] : [];
+}
+
+function extractLinks(text: string): string[] {
+  const matches = text.match(/https?:\/\/[^\s)]+/gi);
+  const unique = new Set(matches || []);
+  // Filter for professional domains
+  const professional = [...unique].filter(url => 
+    /(linkedin\.com|github\.com|portfolio|medium\.com|behance\.net|dribbble\.com|gitlab\.com|bitbucket\.org)/i.test(url)
+  );
+  return professional.length > 0 ? professional : [...unique];
+}
+
+function extractName(text: string): string {
+  // Look at first 10 lines for name patterns
+  const lines = text.split(/\r?\n/).slice(0, 10)
+    .map(l => l.trim())
+    .filter(Boolean);
+  
+  // Prefer lines with 2-4 capitalized words
+  const candidates = lines.filter(l => 
+    /^[A-Z][a-z]+(?:\s+[A-Z][a-z'-]+){1,3}$/.test(l) &&
+    l.length > 5 &&
+    l.length < 50
+  );
+  
+  if (candidates.length > 0) {
+    return candidates[0];
+  }
+  
+  // Fallback: first line with capital letters
+  const fallback = lines.find(l => 
+    /^[A-Z][a-z]/.test(l) &&
+    l.length > 3 &&
+    l.length < 50 &&
+    !/^(curriculum|resume|cv|profile|about|contact)/i.test(l)
+  );
+  
+  return fallback || lines[0] || '';
+}
+
+function extractSkills(text: string): string[] {
+  const foundSkills = new Set<string>();
+  const lowerText = text.toLowerCase();
+  
+  for (const skill of SKILLS_DICT) {
+    // Escape special regex characters
+    const escaped = skill.replace(/[+.^$*|{}()[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+    
+    if (regex.test(lowerText)) {
+      // Find the actual match to preserve original case
+      const match = text.match(regex);
+      if (match) {
+        foundSkills.add(match[0]);
+      }
+    }
+  }
+  
+  return [...foundSkills];
+}
+
+// Step 3: OCR fallback using Gemini Vision
+async function ocrWithGemini(arrayBuffer: ArrayBuffer): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
+  }
+
+  // Convert to base64
   const bytes = new Uint8Array(arrayBuffer);
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
   }
-  return btoa(binary);
+  const base64Pdf = btoa(binary);
+
+  console.log('Using Gemini Vision for OCR...');
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extract ALL text from this document. Return only the raw text content, preserving line breaks. Do not add any commentary or formatting.'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:application/pdf;base64,${base64Pdf}`
+              }
+            }
+          ]
+        }
+      ]
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini OCR failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || '';
 }
 
 serve(async (req) => {
@@ -40,166 +249,47 @@ serve(async (req) => {
 
     console.log('File received:', file.name, 'Size:', file.size);
 
-    // Get PDF as base64
     const arrayBuffer = await file.arrayBuffer();
-    const base64Pdf = await pdfToBase64(arrayBuffer);
+    const bytes = new Uint8Array(arrayBuffer);
     
-    console.log('PDF converted to base64, size:', base64Pdf.length);
-
-    // Use Gemini's vision capability to analyze the PDF visually
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    // Step 1: Try text extraction
+    console.log('Attempting text extraction...');
+    let extractedText = extractTextFromPDF(bytes);
+    
+    console.log('Extracted text length:', extractedText.length);
+    console.log('Text preview:', extractedText.slice(0, 300));
+    
+    // Step 2: Detect if OCR is needed
+    const cleanText = extractedText.replace(/\s+/g, '');
+    const needsOCR = !extractedText || cleanText.length < 50;
+    
+    if (needsOCR) {
+      console.log('Text extraction insufficient, using OCR fallback...');
+      extractedText = await ocrWithGemini(arrayBuffer);
+      console.log('OCR result length:', extractedText.length);
+      console.log('OCR preview:', extractedText.slice(0, 300));
+    }
+    
+    if (!extractedText || extractedText.trim().length < 20) {
+      throw new Error('Could not extract text from PDF');
     }
 
-    console.log('Calling Gemini with vision for PDF analysis...');
+    // Step 3: Apply robust heuristics
+    console.log('Applying extraction heuristics...');
+    
+    const emails = extractEmail(extractedText);
+    const phones = extractPhones(extractedText);
+    const links = extractLinks(extractedText);
+    const name = extractName(extractedText);
+    const skills = extractSkills(extractedText);
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert CV/Resume parser with perfect visual recognition capabilities.
-
-CRITICAL INSTRUCTIONS:
-- You will receive a PDF document as an image
-- READ IT CAREFULLY and extract ONLY the information that is actually visible in the document
-- DO NOT make up or hallucinate any information
-- If a field is not clearly visible, leave it empty
-
-EXTRACTION RULES:
-
-📝 NAME:
-- Extract the full name exactly as written in the document
-- Usually at the top of the CV
-
-📧 EMAIL:
-- Must be a valid email address visible in the document
-- Format: something@domain.com
-
-📞 PHONE:
-- Extract the phone number exactly as written
-- Include country code if present
-
-🔗 LINKS:
-- LinkedIn, GitHub, portfolio websites
-- Only extract full URLs that are visible
-
-💼 SKILLS:
-- Only extract REAL technical skills that are explicitly listed
-- Include: Programming languages, frameworks, databases, cloud platforms, tools
-- Categories: JavaScript, Python, React, Node.js, AWS, Docker, Git, etc.
-- DO NOT extract: company names, soft skills, random words
-- Each skill should be 2+ characters
-
-QUALITY OVER QUANTITY:
-- Only extract what you can clearly see
-- Empty fields are better than wrong data
-- Be precise and accurate`
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Please analyze this CV/Resume PDF and extract the candidate information. Read the document carefully and extract only the information that is clearly visible.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:application/pdf;base64,${base64Pdf}`
-                }
-              }
-            ]
-          }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_cv_data",
-              description: "Extract structured information from a CV/Resume",
-              parameters: {
-                type: "object",
-                properties: {
-                  name: { type: "string", description: "Full name of the candidate" },
-                  email: { type: "string", description: "Email address" },
-                  phone: { type: "string", description: "Phone number" },
-                  links: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "LinkedIn, GitHub, portfolio URLs"
-                  },
-                  skills: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "Technical skills only"
-                  }
-                },
-                required: ["name", "email", "phone", "links", "skills"],
-                additionalProperties: false
-              }
-            }
-          }
-        ],
-        tool_choice: { type: "function", function: { name: "extract_cv_data" } }
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      throw new Error(`AI API error: ${errorText}`);
-    }
-
-    const aiData = await aiResponse.json();
-    console.log('AI response received');
-
-    let parsedCV: ParsedCV;
-
-    // Extract from tool call response
-    if (aiData.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments) {
-      const args = aiData.choices[0].message.tool_calls[0].function.arguments;
-      parsedCV = typeof args === 'string' ? JSON.parse(args) : args;
-    } else {
-      throw new Error('No tool call response from AI');
-    }
-
-    // Clean up and validate the extracted data
-    if (parsedCV.skills && Array.isArray(parsedCV.skills)) {
-      const cleanedSkills = new Set<string>();
-      
-      parsedCV.skills.forEach((skill: string) => {
-        // Filter out garbage
-        if (skill && 
-            skill.length >= 2 &&
-            !/^[^a-zA-Z0-9]+$/.test(skill) &&
-            !/[|\\\/\[\]{}#$%^&*<>]/.test(skill) &&
-            !skill.match(/^\d+$/)) { // No pure numbers
-          cleanedSkills.add(skill.trim());
-        }
-      });
-      
-      parsedCV.skills = Array.from(cleanedSkills);
-    }
-
-    // Validate email format
-    if (parsedCV.email && !parsedCV.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      console.log('Invalid email detected, clearing:', parsedCV.email);
-      parsedCV.email = '';
-    }
-
-    // Validate phone format (should contain digits)
-    if (parsedCV.phone && !parsedCV.phone.match(/\d{3,}/)) {
-      console.log('Invalid phone detected, clearing:', parsedCV.phone);
-      parsedCV.phone = '';
-    }
+    const parsedCV: ParsedCV = {
+      name: name || 'Unknown Candidate',
+      email: emails[0] || '',
+      phone: phones[0] || '',
+      links: links,
+      skills: skills
+    };
 
     console.log('Successfully parsed CV:', parsedCV);
 
