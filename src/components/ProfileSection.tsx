@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Upload, User } from "lucide-react";
+import { Loader2, Save, Upload, User, FileText, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
@@ -29,6 +29,8 @@ const ProfileSection = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -103,6 +105,120 @@ const ProfileSection = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+
+    if (file.type !== "application/pdf") {
+      toast({
+        title: "Error",
+        description: "Please upload a PDF file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Delete old CV if exists
+      if (profile.cv_url) {
+        const oldPath = profile.cv_url.split("/").pop();
+        if (oldPath) {
+          await supabase.storage.from("cvs").remove([`${user.id}/${oldPath}`]);
+        }
+      }
+
+      // Upload new CV
+      const fileName = `${Date.now()}_${file.name}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("cvs")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from("cvs")
+        .getPublicUrl(filePath);
+
+      // Update profile with CV URL
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ cv_url: publicUrl })
+        .eq("id", profile.id);
+
+      if (updateError) throw updateError;
+
+      setProfile({ ...profile, cv_url: publicUrl });
+
+      toast({
+        title: "Success",
+        description: "CV uploaded successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleDeleteCV = async () => {
+    if (!profile?.cv_url) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Delete from storage
+      const oldPath = profile.cv_url.split("/").pop();
+      if (oldPath) {
+        await supabase.storage.from("cvs").remove([`${user.id}/${oldPath}`]);
+      }
+
+      // Update profile
+      const { error } = await supabase
+        .from("profiles")
+        .update({ cv_url: null })
+        .eq("id", profile.id);
+
+      if (error) throw error;
+
+      setProfile({ ...profile, cv_url: null });
+
+      toast({
+        title: "Success",
+        description: "CV deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -262,22 +378,75 @@ const ProfileSection = () => {
         </Card>
       )}
 
-      {profile.cv_url && (
-        <Card>
-          <CardHeader>
-            <CardTitle>CV Document</CardTitle>
-            <CardDescription>Your uploaded resume</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" asChild>
-              <a href={profile.cv_url} target="_blank" rel="noopener noreferrer">
-                <Upload className="w-4 h-4 mr-2" />
-                View CV
-              </a>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>CV Document</CardTitle>
+          <CardDescription>Upload your resume (PDF, max 5MB)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {profile.cv_url ? (
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <FileText className="w-8 h-8 text-primary" />
+                <div>
+                  <p className="font-medium">CV Uploaded</p>
+                  <p className="text-sm text-muted-foreground">
+                    {profile.cv_url.split("/").pop()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a href={profile.cv_url} target="_blank" rel="noopener noreferrer">
+                    <Upload className="w-4 h-4 mr-2" />
+                    View
+                  </a>
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={handleDeleteCV}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed rounded-lg p-8 text-center">
+              <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mb-4">
+                No CV uploaded yet
+              </p>
+              <Input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={handleCVUpload}
+                disabled={uploading}
+                className="hidden"
+                id="cv-upload"
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload CV
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
