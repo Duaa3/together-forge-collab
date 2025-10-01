@@ -20,6 +20,7 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
+  const [parsedData, setParsedData] = useState<any>(null);
   const [extractionSteps, setExtractionSteps] = useState({
     pdfLoading: false,
     regexProcessing: false,
@@ -77,6 +78,9 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
       setExtractionSteps(prev => ({ ...prev, dataValidation: true }));
       await new Promise(resolve => setTimeout(resolve, 300));
       
+      // Store parsed data for submission
+      setParsedData(data);
+      
       // Auto-fill form with extracted data
       if (data.name) setName(data.name);
       if (data.email) setEmail(data.email);
@@ -132,14 +136,23 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
 
       if (uploadError) throw uploadError;
 
-      // Insert candidate record with CV path
+      // Extract github and linkedin from parsed data
+      const github = parsedData?.links?.find((link: string) => link.includes('github')) || null;
+      const linkedin = parsedData?.links?.find((link: string) => link.includes('linkedin')) || null;
+
+      // Insert candidate record with CV path and parsed data
       const { error } = await supabase.from("candidates").insert({
         job_id: jobId,
         user_id: user.id,
         name,
         email,
         phone,
+        github,
+        linkedin,
         cv_path: fileName,
+        extracted_skills: parsedData?.skills || [],
+        match_score: 0,
+        decision: 'pending',
       });
 
       if (error) throw error;
