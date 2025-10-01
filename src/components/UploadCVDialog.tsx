@@ -31,35 +31,53 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
     setFiles(files.filter((_, i) => i !== index));
   };
 
-  const extractCandidateInfo = (text: string) => {
-    // Simple extraction logic (in real app, would use AI/NLP)
-    const emailRegex = /[\w.-]+@[\w.-]+\.\w+/;
-    const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
-    const githubRegex = /github\.com\/[\w-]+/;
-    const linkedinRegex = /linkedin\.com\/in\/[\w-]+/;
+  const extractCandidateInfo = async (file: File) => {
+    try {
+      console.log(`Parsing CV: ${file.name}`);
+      
+      // Use AI edge function for extraction
+      const formData = new FormData();
+      formData.append('file', file);
 
-    const email = text.match(emailRegex)?.[0] || null;
-    const phone = text.match(phoneRegex)?.[0] || null;
-    const github = text.match(githubRegex)?.[0] ? `https://${text.match(githubRegex)?.[0]}` : null;
-    const linkedin = text.match(linkedinRegex)?.[0] ? `https://${text.match(linkedinRegex)?.[0]}` : null;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-cv`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
-    // Extract name (first line that looks like a name)
-    const lines = text.split("\n").filter(line => line.trim().length > 0);
-    const name = lines[0]?.substring(0, 100) || "Unknown Candidate";
+      if (!response.ok) {
+        throw new Error('Failed to parse CV');
+      }
 
-    // Extract skills (simple keyword matching)
-    const commonSkills = [
-      "JavaScript", "TypeScript", "React", "Node.js", "Python", "Java", "C++", 
-      "SQL", "MongoDB", "AWS", "Docker", "Kubernetes", "Git", "HTML", "CSS",
-      "Vue", "Angular", "Express", "Django", "Flask", "Spring", "GraphQL",
-      "PostgreSQL", "MySQL", "Redis", "REST API", "CI/CD", "Agile", "Scrum"
-    ];
+      const data = await response.json();
+      console.log(`Successfully parsed ${file.name}:`, data);
+      
+      return {
+        name: data.name || 'Unknown Candidate',
+        email: data.email || null,
+        phone: data.phone || null,
+        github: data.links?.find((l: string) => l.includes('github')) || null,
+        linkedin: data.links?.find((l: string) => l.includes('linkedin')) || null,
+        extractedSkills: data.skills || []
+      };
+    } catch (error) {
+      console.error(`Error parsing ${file.name}:`, error);
+      // Fallback to basic extraction
+      const text = await file.text();
+      const emailRegex = /[\w.-]+@[\w.-]+\.\w+/;
+      const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
 
-    const extractedSkills = commonSkills.filter(skill => 
-      text.toLowerCase().includes(skill.toLowerCase())
-    );
-
-    return { name, email, phone, github, linkedin, extractedSkills };
+      return {
+        name: 'Unknown Candidate',
+        email: text.match(emailRegex)?.[0] || null,
+        phone: text.match(phoneRegex)?.[0] || null,
+        github: null,
+        linkedin: null,
+        extractedSkills: []
+      };
+    }
   };
 
   const calculateScore = (candidateSkills: string[], mandatorySkills: any, preferredSkills: any) => {
@@ -107,52 +125,61 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
     if (files.length === 0) {
       toast({
         title: "No files selected",
-        description: "Please select at least one PDF file",
+        description: "Please select at least one file",
         variant: "destructive",
       });
       return;
     }
 
     setLoading(true);
+    let successCount = 0;
+    let failedCount = 0;
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
       for (const file of files) {
-        // Read file content
-        const text = await file.text();
-        
-        // Extract candidate information
-        const { name, email, phone, github, linkedin, extractedSkills } = extractCandidateInfo(text);
-        
-        // Calculate match score
-        const { score, decision } = calculateScore(
-          extractedSkills,
-          job.mandatory_skills,
-          job.preferred_skills
-        );
+        try {
+          console.log(`Processing ${file.name}...`);
+          
+          // Extract candidate information using AI
+          const { name, email, phone, github, linkedin, extractedSkills } = await extractCandidateInfo(file);
+          
+          // Calculate match score
+          const { score, decision } = calculateScore(
+            extractedSkills,
+            job.mandatory_skills,
+            job.preferred_skills
+          );
 
-        // Insert candidate into database
-        const { error } = await supabase.from("candidates").insert({
-          job_id: jobId,
-          user_id: user.id,
-          name,
-          email,
-          phone,
-          github,
-          linkedin,
-          extracted_skills: extractedSkills,
-          match_score: score,
-          decision,
-        });
+          console.log(`${file.name} - Score: ${score}%, Decision: ${decision}`);
 
-        if (error) throw error;
+          // Insert candidate into database
+          const { error } = await supabase.from("candidates").insert({
+            job_id: jobId,
+            user_id: user.id,
+            name,
+            email,
+            phone,
+            github,
+            linkedin,
+            extracted_skills: extractedSkills,
+            match_score: score,
+            decision,
+          });
+
+          if (error) throw error;
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to process ${file.name}:`, error);
+          failedCount++;
+        }
       }
 
       toast({
         title: "CVs processed!",
-        description: `Successfully processed ${files.length} candidate(s)`,
+        description: `Successfully processed ${successCount} candidate(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}`,
       });
 
       setFiles([]);
@@ -187,7 +214,7 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
             </p>
             <input
               type="file"
-              accept=".pdf,.txt"
+              accept=".pdf,.doc,.docx,.txt"
               multiple
               onChange={handleFileChange}
               className="hidden"

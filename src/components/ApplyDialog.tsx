@@ -19,7 +19,55 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
   const [phone, setPhone] = useState("");
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const { toast } = useToast();
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCvFile(file);
+    setParsing(true);
+
+    try {
+      // Parse CV using edge function
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-cv`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to parse CV');
+      }
+
+      const data = await response.json();
+      
+      // Auto-fill form with extracted data
+      if (data.name) setName(data.name);
+      if (data.email) setEmail(data.email);
+      if (data.phone) setPhone(data.phone);
+
+      toast({
+        title: "Success",
+        description: "CV parsed successfully! Please verify the extracted information.",
+      });
+    } catch (error) {
+      console.error('Error parsing CV:', error);
+      toast({
+        title: "Warning",
+        description: "Could not auto-fill from CV. Please enter details manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setParsing(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,22 +183,28 @@ const ApplyDialog = ({ jobId, onSuccess }: ApplyDialogProps) => {
                 id="cv"
                 type="file"
                 accept=".pdf,.doc,.docx"
-                onChange={(e) => setCvFile(e.target.files?.[0] || null)}
+                onChange={handleFileChange}
                 required
                 className="cursor-pointer"
+                disabled={parsing}
               />
-              {cvFile && (
+              {cvFile && !parsing && (
                 <FileText className="w-5 h-5 text-primary" />
               )}
             </div>
-            {cvFile && (
+            {parsing && (
+              <p className="text-sm text-muted-foreground animate-pulse">
+                Parsing CV and extracting information...
+              </p>
+            )}
+            {cvFile && !parsing && (
               <p className="text-sm text-muted-foreground">
-                Selected: {cvFile.name}
+                Selected: {cvFile.name} - Information extracted!
               </p>
             )}
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Submitting..." : "Submit Application"}
+          <Button type="submit" className="w-full" disabled={loading || parsing}>
+            {loading ? "Submitting..." : parsing ? "Parsing CV..." : "Submit Application"}
           </Button>
         </form>
       </DialogContent>
