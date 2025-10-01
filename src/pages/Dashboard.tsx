@@ -28,14 +28,25 @@ const Dashboard = () => {
       .from("user_roles")
       .select("role")
       .eq("user_id", session.user.id)
-      .single();
+      .maybeSingle();
 
-    if (error || !roleData) {
+    if (error) {
       toast({
         title: "Error",
-        description: "Unable to determine user role",
+        description: "Failed to fetch user role",
         variant: "destructive",
       });
+      navigate("/auth");
+      return;
+    }
+
+    if (!roleData) {
+      toast({
+        title: "Setup Required",
+        description: "Please complete your account setup",
+        variant: "destructive",
+      });
+      await supabase.auth.signOut();
       navigate("/auth");
       return;
     }
