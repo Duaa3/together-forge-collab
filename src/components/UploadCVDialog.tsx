@@ -116,7 +116,7 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
 
     // Decision logic: Accept if score >= 60 and has all mandatory skills
     const hasAllMandatory = mandatory.length === 0 || mandatoryMatches === mandatory.length;
-    const decision = score >= 60 && hasAllMandatory ? "accept" : "reject";
+    const decision = score >= 60 && hasAllMandatory ? "accepted" : "rejected";
 
     return { score: Math.round(score * 100) / 100, decision };
   };
