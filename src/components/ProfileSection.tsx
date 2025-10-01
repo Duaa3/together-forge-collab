@@ -113,7 +113,6 @@ const ProfileSection = () => {
       profile.linkedin_url,
       profile.portfolio_url,
       profile.bio,
-      profile.skills?.length,
     ];
     const completed = fields.filter(Boolean).length;
     return Math.round((completed / fields.length) * 100);
