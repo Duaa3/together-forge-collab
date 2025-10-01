@@ -1,6 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @deno-types="https://esm.sh/v135/@types/pdf-parse@1.1.4/index.d.ts"
-import pdfParse from "https://esm.sh/pdf-parse@1.1.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +12,8 @@ interface ParsedCV {
   links: string[];
   skills: string[];
 }
+
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
 // Comprehensive skills dictionary
 const SKILLS_DICT = [
@@ -119,21 +119,112 @@ function extractSkills(text: string): string[] {
   return [...foundSkills];
 }
 
-// Use pdf-parse to extract text from PDF
-async function extractTextWithPDFParse(arrayBuffer: ArrayBuffer): Promise<string> {
-  console.log('Using pdf-parse to extract text from PDF...');
+// Use Lovable AI to extract structured data from PDF
+async function extractCVDataWithAI(arrayBuffer: ArrayBuffer): Promise<ParsedCV> {
+  console.log('Using Lovable AI to extract CV data from PDF...');
+  
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY is not configured');
+  }
+
+  // Convert PDF to base64
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
   
   try {
-    const buffer = new Uint8Array(arrayBuffer);
-    const data = await pdfParse(buffer);
-    
-    console.log(`PDF parsed: ${data.numpages} pages, ${data.text.length} characters`);
-    console.log('PDF.js extraction successful, length:', data.text.length);
-    
-    return data.text;
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Extract the candidate information from this CV/Resume PDF. Extract: full name, email address, phone number, professional links (LinkedIn, GitHub, portfolio, etc.), and technical skills.'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:application/pdf;base64,${base64}`
+                }
+              }
+            ]
+          }
+        ],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_cv_data',
+              description: 'Extract structured candidate information from CV',
+              parameters: {
+                type: 'object',
+                properties: {
+                  name: {
+                    type: 'string',
+                    description: 'Full name of the candidate'
+                  },
+                  email: {
+                    type: 'string',
+                    description: 'Email address'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Phone number'
+                  },
+                  links: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Professional links (LinkedIn, GitHub, portfolio, etc.)'
+                  },
+                  skills: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Technical skills and technologies'
+                  }
+                },
+                required: ['name', 'email', 'phone', 'links', 'skills'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_cv_data' } }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Lovable AI error:', response.status, errorText);
+      throw new Error(`AI extraction failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('AI response:', JSON.stringify(data, null, 2));
+
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) {
+      throw new Error('No tool call in AI response');
+    }
+
+    const extractedData = JSON.parse(toolCall.function.arguments);
+    console.log('Extracted CV data:', extractedData);
+
+    return {
+      name: extractedData.name || 'Unknown Candidate',
+      email: extractedData.email || '',
+      phone: extractedData.phone || '',
+      links: extractedData.links || [],
+      skills: extractedData.skills || []
+    };
   } catch (error) {
-    console.error('PDF parsing error:', error);
-    throw new Error('Failed to extract text from PDF using pdf-parse');
+    console.error('AI extraction error:', error);
+    throw error;
   }
 }
 
@@ -155,51 +246,9 @@ serve(async (req) => {
 
     const arrayBuffer = await file.arrayBuffer();
     
-    // Extract text using pdf-parse library
-    console.log('Extracting text with pdf-parse...');
-    let extractedText = '';
-    
-    try {
-      extractedText = await extractTextWithPDFParse(arrayBuffer);
-      console.log('pdf-parse extraction successful, length:', extractedText.length);
-      console.log('Text preview:', extractedText.slice(0, 500));
-    } catch (pdfError) {
-      console.error('pdf-parse extraction failed:', pdfError);
-      throw new Error('Failed to extract text from PDF. Please ensure the PDF is readable.');
-    }
-    
-    if (!extractedText || extractedText.trim().length < 20) {
-      throw new Error('Could not extract sufficient text from PDF');
-    }
-
-    // Apply robust heuristics
-    console.log('Applying extraction heuristics...');
-    
-    const emails = extractEmail(extractedText);
-    const phones = extractPhones(extractedText);
-    const links = extractLinks(extractedText);
-    const name = extractName(extractedText);
-    const skills = extractSkills(extractedText);
-
-    const parsedCV: ParsedCV = {
-      name: name || 'Unknown Candidate',
-      email: emails[0] || '',
-      phone: phones[0] || '',
-      links: links,
-      skills: skills
-    };
-    
-    // Validate the extracted name - reject if it's garbage
-    if (parsedCV.name && parsedCV.name !== 'Unknown Candidate') {
-      const nameAlphanumeric = (parsedCV.name.match(/[a-zA-Z]/g) || []).length;
-      const nameRatio = nameAlphanumeric / parsedCV.name.length;
-      
-      // Name should be at least 60% letters and less than 100 characters
-      if (nameRatio < 0.6 || parsedCV.name.length > 100) {
-        console.log('Invalid name detected, resetting:', parsedCV.name.slice(0, 50));
-        parsedCV.name = 'Unknown Candidate';
-      }
-    }
+    // Extract CV data using Lovable AI
+    console.log('Extracting CV data with Lovable AI...');
+    const parsedCV = await extractCVDataWithAI(arrayBuffer);
 
     console.log('Successfully parsed CV:', parsedCV);
 
