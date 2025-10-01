@@ -1,5 +1,6 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @deno-types="https://esm.sh/v135/@types/pdf-parse@1.1.4/index.d.ts"
+import pdfParse from "https://esm.sh/pdf-parse@1.1.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -118,68 +119,22 @@ function extractSkills(text: string): string[] {
   return [...foundSkills];
 }
 
-// Use Gemini to extract text from PDF (treating as document, not image)
-async function extractTextWithGemini(arrayBuffer: ArrayBuffer): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    throw new Error('LOVABLE_API_KEY not configured');
+// Use pdf-parse to extract text from PDF
+async function extractTextWithPDFParse(arrayBuffer: ArrayBuffer): Promise<string> {
+  console.log('Using pdf-parse to extract text from PDF...');
+  
+  try {
+    const buffer = new Uint8Array(arrayBuffer);
+    const data = await pdfParse(buffer);
+    
+    console.log(`PDF parsed: ${data.numpages} pages, ${data.text.length} characters`);
+    console.log('PDF.js extraction successful, length:', data.text.length);
+    
+    return data.text;
+  } catch (error) {
+    console.error('PDF parsing error:', error);
+    throw new Error('Failed to extract text from PDF using pdf-parse');
   }
-
-  // Convert to base64 in chunks to avoid memory issues
-  const bytes = new Uint8Array(arrayBuffer);
-  let binary = '';
-  const chunkSize = 8192;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode(...chunk);
-  }
-  const base64Pdf = btoa(binary);
-
-  console.log('Using Gemini to extract text from PDF...');
-
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Extract ALL text from this CV/Resume document. Return the complete text content exactly as it appears, preserving:
-- Names, contact information (email, phone)
-- All sections (Education, Experience, Projects, Skills, etc.)
-- Dates and locations
-- Bullet points and descriptions
-- Links and URLs
-
-Return ONLY the extracted text, no commentary or formatting instructions.`
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:application/pdf;base64,${base64Pdf}`
-              }
-            }
-          ]
-        }
-      ]
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Gemini extraction error:', response.status, errorText);
-    throw new Error(`Gemini extraction failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || '';
 }
 
 serve(async (req) => {
@@ -200,16 +155,16 @@ serve(async (req) => {
 
     const arrayBuffer = await file.arrayBuffer();
     
-    // Try Gemini-based text extraction directly
-    console.log('Extracting text with Gemini Vision...');
+    // Extract text using pdf-parse library
+    console.log('Extracting text with pdf-parse...');
     let extractedText = '';
     
     try {
-      extractedText = await extractTextWithGemini(arrayBuffer);
-      console.log('Gemini extraction successful, length:', extractedText.length);
+      extractedText = await extractTextWithPDFParse(arrayBuffer);
+      console.log('pdf-parse extraction successful, length:', extractedText.length);
       console.log('Text preview:', extractedText.slice(0, 500));
-    } catch (geminiError) {
-      console.error('Gemini extraction failed:', geminiError);
+    } catch (pdfError) {
+      console.error('pdf-parse extraction failed:', pdfError);
       throw new Error('Failed to extract text from PDF. Please ensure the PDF is readable.');
     }
     
