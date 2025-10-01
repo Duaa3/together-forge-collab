@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import pako from "https://esm.sh/pako@2.1.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,175 +15,91 @@ interface ParsedCV {
   extractedSkills: string[];
 }
 
-// Clean PDF metadata and artifacts from text
-function cleanPDFMetadata(text: string): string {
-  // Remove common PDF metadata patterns aggressively
+// Clean and normalize extracted text
+function cleanExtractedText(text: string): string {
+  if (!text) return '';
+  
+  // Remove common PDF artifacts and metadata
   const metadataPatterns = [
-    /Skia\/PDF\s+\S+/gi,
-    /Google\s+Docs?\s+Renderer/gi,
-    /Adobe\s+Identity/gi,
-    /endstream\s+endobj/gi,
-    /\/Type\s+\/Font/gi,
-    /\/Subtype\s+\/Type\d+/gi,
-    /\/BaseFont\s+\/[A-Z]+\+\w+/gi,
-    /\/Encoding\s+\/\w+/gi,
-    /\/DescendantFonts/gi,
-    /\/ToUnicode/gi,
-    /\/Length\d?\s+\d+/gi,
-    /\/Filter\s+\/\w+/gi,
-    /\/FlateDecode/gi,
-    /<<[^>]*>>/g,
-    /\d+\s+0\s+obj/g,
-    /stream\s+[^a-zA-Z]*/gi,
+    /Adobe\s+Identity\s+Adobe/gi,
+    /Skia\/PDF/gi,
+    /Google\s+Docs\s+Renderer/gi,
+    /PDF\s+version/gi,
+    /Creator:/gi,
+    /Producer:/gi,
+    /CreationDate:/gi,
+    /ModDate:/gi,
+    /Font\s+\w+/gi,
+    /Encoding:/gi,
+    /BaseFont:/gi,
+    /Subtype:/gi,
+    /Type:/gi,
+    /\bobj\b/gi,
+    /\bendobj\b/gi,
+    /stream\b/gi,
+    /endstream\b/gi,
+    /\bxref\b/gi,
+    /\btrailer\b/gi,
+    /startxref/gi,
   ];
   
   let cleaned = text;
   for (const pattern of metadataPatterns) {
-    cleaned = cleaned.replace(pattern, ' ');
+    cleaned = cleaned.replace(pattern, '');
   }
   
-  // Remove excessive whitespace
+  // Remove excessive whitespace, normalize line breaks
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  cleaned = cleaned.replace(/\r\n/g, '\n');
+  cleaned = cleaned.replace(/\n\s*\n+/g, '\n');
+  
+  // Remove non-printable characters but keep basic punctuation
+  cleaned = cleaned.replace(/[^\x20-\x7E\n]/g, '');
   
   return cleaned;
 }
 
+// Comprehensive skills dictionary
 const SKILLS_DICT = [
   // Programming Languages
-  'javascript', 'js', 'typescript', 'ts', 'python', 'java', 'c++', 'cpp', 'c#', 'csharp',
-  'ruby', 'php', 'swift', 'kotlin', 'go', 'golang', 'rust', 'scala', 'r', 'matlab',
-  'perl', 'shell', 'bash', 'powershell', 'objective-c', 'dart', 'elixir', 'haskell',
-  'lua', 'assembly', 'c', 'vb.net', 'f#', 'clojure', 'erlang', 'groovy',
+  "javascript", "typescript", "python", "java", "c++", "c#", "ruby", "php", "swift", "kotlin",
+  "go", "rust", "scala", "perl", "r", "matlab", "objective-c", "dart", "elixir", "clojure",
   
-  // Web Frontend
-  'html', 'html5', 'css', 'css3', 'sass', 'scss', 'less', 'tailwind', 'tailwindcss',
-  'bootstrap', 'material-ui', 'mui', 'chakra ui', 'ant design', 'semantic ui',
-  'react', 'reactjs', 'react.js', 'angular', 'angularjs', 'vue', 'vuejs', 'vue.js',
-  'svelte', 'ember', 'backbone', 'jquery', 'next.js', 'nextjs', 'nuxt.js', 'nuxtjs',
-  'gatsby', 'remix', 'astro', 'webpack', 'vite', 'rollup', 'parcel', 'babel', 'turbopack',
-  'redux', 'mobx', 'zustand', 'recoil', 'context api', 'react query', 'swr', 'tanstack query',
-  'styled-components', 'emotion', 'css modules', 'postcss',
+  // Web Technologies
+  "html", "css", "sass", "less", "react", "angular", "vue", "svelte", "nextjs", "nuxt",
+  "jquery", "bootstrap", "tailwind", "redux", "mobx", "webpack", "vite", "babel", "graphql",
   
-  // Web Backend
-  'node.js', 'nodejs', 'express', 'expressjs', 'nestjs', 'fastify', 'koa', 'hapi',
-  'django', 'flask', 'fastapi', 'spring', 'spring boot', 'asp.net', '.net core', '.net',
-  'laravel', 'symfony', 'codeigniter', 'yii', 'cakephp',
-  'rails', 'ruby on rails', 'sinatra', 'gin', 'fiber', 'echo', 'chi',
-  'actix', 'axum', 'rocket', 'warp',
+  // Backend & Databases
+  "nodejs", "express", "django", "flask", "spring", "laravel", "rails", "asp.net",
+  "mongodb", "postgresql", "mysql", "redis", "elasticsearch", "cassandra", "dynamodb",
+  "sql", "nosql", "oracle", "mariadb",
   
-  // Mobile Development
-  'react native', 'flutter', 'ionic', 'xamarin', 'cordova', 'phonegap', 'capacitor',
-  'swift ui', 'swiftui', 'jetpack compose', 'android', 'ios', 'kotlin multiplatform',
+  // Cloud & DevOps
+  "aws", "azure", "gcp", "docker", "kubernetes", "terraform", "ansible", "jenkins",
+  "circleci", "github actions", "gitlab ci", "travis ci", "heroku", "netlify", "vercel",
   
-  // Databases & Data
-  'sql', 'mysql', 'postgresql', 'postgres', 'mongodb', 'mongo', 'redis', 'cassandra',
-  'oracle', 'sqlite', 'mariadb', 'dynamodb', 'couchdb', 'neo4j', 'graphdb', 'arangodb',
-  'elasticsearch', 'solr', 'memcached', 'influxdb', 'timescaledb', 'cockroachdb',
-  'firebase', 'firestore', 'supabase', 'planetscale', 'neon', 'turso',
-  'prisma', 'typeorm', 'sequelize', 'mongoose', 'knex', 'drizzle',
-  'sql alchemy', 'sqlalchemy', 'hibernate', 'entity framework', 'dapper',
-  'nosql', 'sql server', 'mssql', 'db2',
+  // Tools & Practices
+  "git", "jira", "agile", "scrum", "kanban", "ci/cd", "tdd", "bdd", "microservices",
+  "rest api", "soap", "grpc", "oauth", "jwt", "linux", "bash", "powershell",
   
-  // Cloud Platforms
-  'aws', 'amazon web services', 'azure', 'microsoft azure', 'gcp', 'google cloud',
-  'heroku', 'digitalocean', 'linode', 'vultr', 'netlify', 'vercel', 'cloudflare',
-  'railway', 'render', 'fly.io', 'deno deploy',
+  // Data & AI
+  "machine learning", "deep learning", "tensorflow", "pytorch", "keras", "scikit-learn",
+  "pandas", "numpy", "data analysis", "data visualization", "tableau", "power bi",
+  "ai", "ml", "nlp", "computer vision", "big data", "hadoop", "spark",
   
-  // Cloud Services
-  'ec2', 's3', 'lambda', 'rds', 'dynamodb', 'cloudfront', 'route53', 'elb', 'alb',
-  'ecs', 'eks', 'fargate', 'sqs', 'sns', 'cloudwatch', 'iam', 'cognito',
-  'azure functions', 'azure devops', 'azure ad', 'blob storage', 'azure sql',
-  'compute engine', 'cloud functions', 'cloud run', 'bigquery', 'cloud storage',
-  'app engine', 'cloud sql', 'pub/sub',
+  // Mobile
+  "ios", "android", "react native", "flutter", "xamarin", "ionic",
   
-  // DevOps & CI/CD
-  'docker', 'kubernetes', 'k8s', 'jenkins', 'gitlab', 'gitlab ci', 'github actions',
-  'circleci', 'travis ci', 'bitbucket pipelines', 'azure pipelines', 'teamcity',
-  'terraform', 'ansible', 'puppet', 'chef', 'saltstack', 'vagrant', 'packer',
-  'helm', 'argocd', 'flux', 'tekton', 'spinnaker', 'rancher', 'openshift',
-  'ci/cd', 'devops', 'gitops', 'infrastructure as code', 'iac', 'continuous integration',
-  'continuous deployment', 'continuous delivery',
-  
-  // Monitoring & Logging
-  'prometheus', 'grafana', 'datadog', 'new relic', 'splunk', 'elk stack', 'elk',
-  'logstash', 'kibana', 'fluentd', 'sentry', 'rollbar', 'bugsnag',
-  'pagerduty', 'opsgenie', 'cloudwatch', 'stackdriver', 'application insights',
-  
-  // Testing
-  'jest', 'mocha', 'chai', 'jasmine', 'karma', 'cypress', 'playwright', 'testcafe',
-  'selenium', 'webdriver', 'puppeteer', 'pytest', 'unittest', 'junit', 'testng',
-  'rspec', 'phpunit', 'vitest', 'testing library', 'react testing library',
-  'unit testing', 'integration testing', 'e2e testing', 'tdd', 'bdd',
-  'test automation', 'qa', 'quality assurance',
-  
-  // API & Integration
-  'rest api', 'restful', 'rest', 'graphql', 'grpc', 'soap', 'websocket', 'socket.io',
-  'api design', 'microservices', 'service mesh', 'api gateway', 'oauth', 'oauth2',
-  'jwt', 'openapi', 'swagger', 'postman', 'insomnia', 'api development',
-  
-  // Version Control
-  'git', 'github', 'gitlab', 'bitbucket', 'svn', 'mercurial', 'perforce',
-  'git flow', 'trunk based development', 'version control',
-  
-  // Project Management
-  'jira', 'confluence', 'trello', 'asana', 'monday', 'notion', 'clickup', 'linear',
-  'agile', 'scrum', 'kanban', 'waterfall', 'lean', 'safe', 'xp', 'extreme programming',
-  'project management', 'product management', 'stakeholder management',
-  
-  // AI & Machine Learning
-  'machine learning', 'ml', 'deep learning', 'dl', 'nlp', 'natural language processing',
-  'computer vision', 'cv', 'tensorflow', 'pytorch', 'keras', 'scikit-learn', 'sklearn',
-  'pandas', 'numpy', 'scipy', 'matplotlib', 'seaborn', 'plotly', 'dask',
-  'opencv', 'yolo', 'transformer', 'bert', 'gpt', 'llm', 'langchain', 'llamaindex',
-  'hugging face', 'huggingface', 'stable diffusion', 'gan', 'cnn', 'rnn', 'lstm',
-  'reinforcement learning', 'supervised learning', 'unsupervised learning',
-  'ai', 'artificial intelligence', 'neural networks', 'data science',
-  'jupyter', 'colab', 'kaggle',
-  
-  // Data Engineering
-  'etl', 'data pipeline', 'data warehouse', 'data lake', 'big data', 'data engineering',
-  'apache spark', 'spark', 'hadoop', 'kafka', 'airflow', 'luigi', 'prefect', 'dagster',
-  'dbt', 'snowflake', 'redshift', 'bigquery', 'databricks', 'delta lake',
-  'data modeling', 'data visualization', 'tableau', 'power bi', 'looker', 'metabase',
-  
-  // Security
-  'security', 'cybersecurity', 'infosec', 'penetration testing', 'ethical hacking',
-  'owasp', 'ssl', 'tls', 'encryption', 'authentication', 'authorization',
-  'oauth', 'saml', 'ldap', 'active directory', 'vault', 'secrets management',
-  'devsecops', 'security testing', 'vulnerability assessment',
-  
-  // Blockchain
-  'blockchain', 'ethereum', 'solidity', 'web3', 'smart contracts', 'defi',
-  'nft', 'cryptocurrency', 'bitcoin', 'hyperledger', 'solana', 'polygon',
-  
-  // Design & UX
-  'ui', 'ux', 'ui/ux', 'figma', 'sketch', 'adobe xd', 'invision', 'zeplin', 'framer',
-  'photoshop', 'illustrator', 'after effects', 'user experience', 'user interface',
-  'wireframing', 'prototyping', 'design systems', 'interaction design',
-  
-  // Other Tools
-  'linux', 'unix', 'windows', 'macos', 'vim', 'emacs', 'vscode', 'visual studio',
-  'intellij', 'pycharm', 'webstorm', 'sublime', 'atom', 'eclipse',
-  'nginx', 'apache', 'tomcat', 'iis', 'rabbitmq', 'redis', 'memcached',
-  'elasticsearch', 'logstash', 'kibana', 'grafana', 'prometheus',
-  
-  // Methodologies & Practices
-  'solid', 'clean code', 'design patterns', 'mvc', 'mvvm', 'clean architecture',
-  'domain driven design', 'ddd', 'event driven', 'cqrs', 'serverless',
-  'pair programming', 'code review', 'refactoring',
-  
-  // Soft Skills
-  'leadership', 'communication', 'problem solving', 'teamwork', 'collaboration',
-  'critical thinking', 'time management', 'adaptability', 'creativity',
-  'mentoring', 'coaching', 'presentation', 'technical writing', 'documentation'
+  // Other
+  "ui/ux", "figma", "sketch", "adobe xd", "photoshop", "illustrator",
+  "seo", "sem", "analytics", "a/b testing", "project management",
 ];
 
+// Extract email addresses from text
 function extractEmail(text: string): string[] {
-  // More comprehensive email pattern
   const emailPattern = /\b[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}\b/gi;
   const matches = text.match(emailPattern);
   const emails = matches ? [...new Set(matches)].filter(email => {
-    // Filter out common false positives
     const invalid = ['example.com', 'test.com', 'email.com', 'domain.com'];
     return !invalid.some(inv => email.toLowerCase().includes(inv));
   }) : [];
@@ -190,6 +107,7 @@ function extractEmail(text: string): string[] {
   return emails;
 }
 
+// Extract phone numbers from text
 function extractPhones(text: string): string[] {
   const phonePatterns = [
     /\+\d{1,4}[\s.-]?\(?\d{1,4}\)?[\s.-]?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{0,4}/g,
@@ -216,6 +134,7 @@ function extractPhones(text: string): string[] {
   return phones;
 }
 
+// Extract links from text
 function extractLinks(text: string): string[] {
   const linkPatterns = [
     /https?:\/\/[^\s\)]+/gi,
@@ -243,185 +162,128 @@ function extractLinks(text: string): string[] {
   return links;
 }
 
+// Extract name from the beginning of clean text
 function extractName(text: string): string {
-  console.log('Extracting name from text...');
+  console.log("Extracting name from text...");
   
-  // Clean metadata first
-  const cleaned = cleanPDFMetadata(text);
+  if (!text || text.trim().length === 0) {
+    return "Unknown Candidate";
+  }
   
-  const lines = cleaned.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const lines = text.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .slice(0, 15); // Check first 15 lines
+  
   console.log(`Processing ${lines.length} lines for name extraction`);
   
-  // Score-based name extraction
-  const nameCandidates: { name: string; score: number; position: number }[] = [];
+  const metadataKeywords = [
+    'cv', 'resume', 'curriculum', 'vitae', 'page', 'of',
+    'email', 'phone', 'tel', 'mobile', 'address', 'street',
+    'city', 'state', 'zip', 'country', 'objective', 'summary',
+    'experience', 'education', 'skills', 'projects', 'certifications'
+  ];
   
-  for (let i = 0; i < Math.min(15, lines.length); i++) {
+  const candidates: { name: string; score: number }[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    // Skip lines that are clearly not names
-    if (line.length < 3 || line.length > 60) continue;
-    if (/^[0-9]+$/.test(line)) continue;
-    if (/^[^a-zA-Z]*$/.test(line)) continue;
-    if (line.toLowerCase().includes('curriculum') || 
-        line.toLowerCase().includes('vitae') ||
-        line.toLowerCase().includes('resume') ||
-        line.toLowerCase().includes('cv')) continue;
+    // Skip empty, too short, or too long lines
+    if (line.length < 4 || line.length > 60) continue;
     
-    let score = 0;
+    // Skip lines with email, URLs, or special characters
+    if (/@/.test(line) || /http|www/.test(line) || /[<>{}[\]\\\/]/.test(line)) continue;
     
-    // Higher score for names at the very beginning
-    score += Math.max(0, 20 - i * 2);
+    // Skip lines with too many numbers
+    const digitCount = (line.match(/\d/g) || []).length;
+    if (digitCount > 3) continue;
     
-    // Check if line matches name pattern (2-4 words, starts with capital)
-    const namePattern = /^[A-Z][a-z]+(?:\s+[A-Z][a-zA-Z-]+){1,4}$/;
-    if (namePattern.test(line)) {
-      score += 30;
-      console.log(`Found name pattern candidate (score ${score}): ${line}`);
+    // Calculate score
+    let score = 15 - i; // Earlier lines get higher base score
+    
+    // Heavy penalty for metadata keywords
+    const lowerLine = line.toLowerCase();
+    const hasMetadata = metadataKeywords.some(keyword => lowerLine.includes(keyword));
+    if (hasMetadata) {
+      score -= 20;
+      continue; // Skip this line entirely
     }
     
-    // Check for common name structures
-    const words = line.split(/\s+/);
+    // Check if line looks like a name (2-5 words, mostly alphabetic)
+    const words = line.split(/\s+/).filter(w => w.length > 0);
     if (words.length >= 2 && words.length <= 5) {
-      const allCapitalized = words.every(w => /^[A-Z]/.test(w));
-      if (allCapitalized) score += 20;
+      // Check if words are mostly alphabetic
+      const alphaCount = (line.match(/[a-zA-Z]/g) || []).length;
+      const alphaRatio = alphaCount / line.length;
+      
+      if (alphaRatio > 0.8) {
+        score += 10;
+        
+        // Bonus for capitalized words
+        const capitalizedCount = words.filter(word => 
+          word.length > 0 && word[0] === word[0].toUpperCase()
+        ).length;
+        
+        if (capitalizedCount === words.length) {
+          score += 5;
+        }
+      }
     }
     
-    // Penalize if contains special characters (except hyphens and apostrophes)
-    if (/[^a-zA-Z\s'-]/.test(line)) score -= 15;
+    // Extra bonus for being in the first 3 lines
+    if (i < 3) score += 3;
     
-    // Penalize very short or very long lines
-    if (line.length < 8) score -= 5;
-    if (line.length > 40) score -= 10;
-    
-    if (score > 0) {
-      nameCandidates.push({ name: line, score, position: i });
-    }
+    candidates.push({ name: line, score });
   }
   
-  // Sort by score and return best candidate
-  nameCandidates.sort((a, b) => b.score - a.score);
+  // Sort by score
+  candidates.sort((a, b) => b.score - a.score);
   
-  if (nameCandidates.length > 0) {
-    console.log(`Best name candidate (score ${nameCandidates[0].score}): ${nameCandidates[0].name}`);
-    return nameCandidates[0].name;
+  console.log("Top name candidates:", candidates.slice(0, 3));
+  
+  if (candidates.length > 0 && candidates[0].score > 5) {
+    return candidates[0].name;
   }
   
-  return 'Unknown Candidate';
+  return "Unknown Candidate";
 }
 
+// Extract skills from clean text with better accuracy
 function extractSkills(text: string): string[] {
-  console.log('Extracting skills...');
+  console.log("Extracting skills...");
   
-  // Clean metadata first
-  const cleaned = cleanPDFMetadata(text);
-  const normalizedText = cleaned.toLowerCase();
-  
-  // Escape special regex characters in skill names BEFORE using them
-  const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+  const cleanedText = cleanExtractedText(text);
   const foundSkills = new Set<string>();
+  const lowerText = cleanedText.toLowerCase();
   
-  // Look for each skill in the dictionary with context
+  // Search for each skill in the text
   for (const skill of SKILLS_DICT) {
     const skillLower = skill.toLowerCase();
-    const escapedSkill = escapeRegex(skillLower);
     
-    // Skip single character skills unless they're common (C, R)
-    if (skillLower.length === 1 && !['c', 'r'].includes(skillLower)) {
-      continue;
-    }
-    
-    // Create context-aware pattern with escaped skill
-    const contextPattern = new RegExp(
-      `(?:^|\\s|[,.:;()])${escapedSkill}(?:$|\\s|[,.:;())])`,
-      'i'
-    );
-    
-    if (contextPattern.test(normalizedText)) {
-      // For single letter skills, require stronger context
-      if (skillLower.length === 1) {
-        const strongContextPattern = new RegExp(
-          `(?:language|programming|proficient|skilled|experience)\\s+(?:in\\s+)?${escapedSkill}(?:\\s|[,.:;]|$)`,
-          'i'
-        );
-        if (strongContextPattern.test(normalizedText)) {
-          foundSkills.add(skill);
-        }
-      } else {
+    // For single-word skills, ensure word boundaries
+    if (!skill.includes(' ')) {
+      const regex = new RegExp(`\\b${skillLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (regex.test(lowerText)) {
+        foundSkills.add(skill);
+      }
+    } else {
+      // For multi-word skills, use simple includes
+      if (lowerText.includes(skillLower)) {
         foundSkills.add(skill);
       }
     }
   }
   
-  // Method 2: Extract from "Skills" section with better parsing
-  const skillsSectionPatterns = [
-    /(?:technical\s*)?skills\s*:?\s*(.*?)(?:\n\s*\n|education|experience|work history|projects|$)/is,
-    /(?:core\s*)?competencies\s*:?\s*(.*?)(?:\n\s*\n|education|experience|$)/is,
-    /technologies\s*:?\s*(.*?)(?:\n\s*\n|education|$)/is,
-  ];
+  const skillsArray = Array.from(foundSkills).sort();
+  console.log(`Extracted ${skillsArray.length} skills:`, skillsArray);
   
-  for (const pattern of skillsSectionPatterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      const skillsText = match[1];
-      console.log(`Found skills section, extracting from ${skillsText.length} chars`);
-      
-      // Split by various delimiters
-      const skillTokens = skillsText.split(/[,;|\n•·▪▫\t]/);
-      
-      skillTokens.forEach(token => {
-        const cleaned = token
-          .trim()
-          .replace(/^[-•·\*\+>\d\.)]+\s*/, '') // Remove bullets
-          .replace(/\([^)]*\)/g, '') // Remove parentheses
-          .toLowerCase();
-        
-        if (cleaned.length > 1 && cleaned.length < 30) {
-          // Check against dictionary
-          for (const skill of SKILLS_DICT) {
-            if (cleaned === skill || 
-                (cleaned.includes(skill) && skill.length > 3) ||
-                (skill.includes(cleaned) && cleaned.length > 3)) {
-              foundSkills.add(skill);
-            }
-          }
-        }
-      });
-    }
-  }
-  
-  // Method 3: Context-based extraction (experience with, proficient in, etc.)
-  const contextPatterns = [
-    /(?:proficient in|experience with|worked with|using|including|expertise in)\s*:?\s*([^.]+)/gi,
-    /\b([\w\s+#.-]{2,20})\s*[-–]\s*(?:\d+\s*(?:years?|yrs)|proficient|expert|advanced)/gi,
-  ];
-  
-  for (const pattern of contextPatterns) {
-    const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
-      const content = match[1].trim().toLowerCase();
-      const tokens = content.split(/[,;|&]/);
-      
-      tokens.forEach(token => {
-        const cleaned = token.trim();
-        if (cleaned.length > 1 && cleaned.length < 30) {
-          for (const skill of SKILLS_DICT) {
-            if (cleaned === skill || cleaned.includes(skill)) {
-              foundSkills.add(skill);
-            }
-          }
-        }
-      });
-    });
-  }
-  
-  const skills = [...foundSkills].sort();
-  console.log(`Extracted ${skills.length} skills:`, skills);
-  return skills;
+  return skillsArray;
 }
 
+// Extract text from PDF with proper decompression
 async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
-  console.log('Starting PDF text extraction, size:', arrayBuffer.byteLength);
+  console.log("Starting PDF text extraction with proper decompression, size:", arrayBuffer.byteLength);
   
   try {
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -436,209 +298,190 @@ async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
     
     const textParts: string[] = [];
     
-    // Method 1: Extract from content streams
-    // Find all stream objects
-    const streamRegex = /stream[\r\n]+([\s\S]*?)[\r\n]+endstream/g;
+    // Find all stream objects with proper decompression
+    const streamRegex = /(\d+\s+\d+\s+obj[\s\S]*?)stream\s*([\s\S]*?)\s*endstream/g;
     let streamMatch;
     let streamCount = 0;
     
     while ((streamMatch = streamRegex.exec(pdfData)) !== null) {
       streamCount++;
-      const streamData = streamMatch[1];
+      const objectHeader = streamMatch[1];
+      const streamData = streamMatch[2];
       
-      // Check if stream is compressed (has FlateDecode filter)
-      const objectStart = pdfData.lastIndexOf('<<', streamMatch.index);
-      const objectHeader = pdfData.substring(objectStart, streamMatch.index);
-      const isCompressed = /\/Filter\s*\/FlateDecode/.test(objectHeader);
+      // Check if stream is compressed
+      const isCompressed = /\/Filter\s*(?:\/FlateDecode|\[\/FlateDecode\])/.test(objectHeader);
       
       if (isCompressed) {
-        console.log(`Stream ${streamCount} is compressed, attempting to extract readable text`);
+        console.log(`Stream ${streamCount} is FlateDecode compressed, decompressing...`);
         try {
-          // Try to extract any readable text fragments from compressed stream
-          const readableText = streamData.match(/[a-zA-Z0-9@.,;:'\-\s]{3,}/g);
-          if (readableText && readableText.length > 0) {
-            textParts.push(...readableText.filter(t => t.trim().length > 2));
+          // Extract the binary stream data
+          const streamBytes: number[] = [];
+          for (let i = 0; i < streamData.length; i++) {
+            streamBytes.push(streamData.charCodeAt(i) & 0xff);
           }
-        } catch (e) {
-          console.log(`Failed to process compressed stream ${streamCount}:`, e);
+          
+          // Decompress using pako
+          const compressed = new Uint8Array(streamBytes);
+          const decompressed = pako.inflate(compressed);
+          const decodedText = new TextDecoder('utf-8', { fatal: false }).decode(decompressed);
+          
+          // Extract text from decompressed data
+          const textMatches = decodedText.match(/\(((?:[^()\\]|\\.)*)\)\s*Tj/g);
+          if (textMatches) {
+            textMatches.forEach(match => {
+              const text = match.match(/\(((?:[^()\\]|\\.)*)\)/);
+              if (text && text[1]) {
+                textParts.push(text[1]);
+              }
+            });
+          }
+          
+          // Also extract from TJ arrays
+          const tjArrayMatches = decodedText.match(/\[((?:[^\[\]\\]|\\.)*)\]\s*TJ/g);
+          if (tjArrayMatches) {
+            tjArrayMatches.forEach(match => {
+              const texts = match.match(/\(((?:[^()\\]|\\.)*)\)/g);
+              if (texts) {
+                texts.forEach(t => {
+                  const cleaned = t.slice(1, -1);
+                  if (cleaned.length > 0) {
+                    textParts.push(cleaned);
+                  }
+                });
+              }
+            });
+          }
+          
+          console.log(`Successfully decompressed stream ${streamCount}, extracted ${textParts.length} text fragments so far`);
+        } catch (decompressError) {
+          const errorMsg = decompressError instanceof Error ? decompressError.message : String(decompressError);
+          console.warn(`Failed to decompress stream ${streamCount}:`, errorMsg);
         }
-        continue;
-      }
-      
-      // Extract text from uncompressed stream using PDF text operators
-      const textMatches = [
-        ...streamData.matchAll(/\(((?:[^()\\]|\\.)*)\)\s*Tj/g),
-        ...streamData.matchAll(/\(((?:[^()\\]|\\.)*)\)\s*TJ/g),
-        ...streamData.matchAll(/\[((?:[^\[\]\\]|\\.)*)\]\s*TJ/g),
-        ...streamData.matchAll(/\(((?:[^()\\]|\\.)*)\)\s*'/g),
-        ...streamData.matchAll(/\(((?:[^()\\]|\\.)*)\)\s*"/g),
-      ];
-      
-      for (const match of textMatches) {
-        if (match[1]) {
-          textParts.push(match[1]);
+      } else {
+        // Extract text from uncompressed streams
+        const textMatches = streamData.match(/\(((?:[^()\\]|\\.)*)\)\s*Tj/g);
+        if (textMatches) {
+          textMatches.forEach(match => {
+            const text = match.match(/\(((?:[^()\\]|\\.)*)\)/);
+            if (text && text[1]) {
+              textParts.push(text[1]);
+            }
+          });
+        }
+        
+        // Extract from TJ arrays
+        const tjArrayMatches = streamData.match(/\[((?:[^\[\]\\]|\\.)*)\]\s*TJ/g);
+        if (tjArrayMatches) {
+          tjArrayMatches.forEach(match => {
+            const texts = match.match(/\(((?:[^()\\]|\\.)*)\)/g);
+            if (texts) {
+              texts.forEach(t => {
+                const cleaned = t.slice(1, -1);
+                if (cleaned.length > 0) {
+                  textParts.push(cleaned);
+                }
+              });
+            }
+          });
         }
       }
     }
     
-    console.log(`Found ${streamCount} streams, extracted ${textParts.length} text fragments from content streams`);
+    console.log(`Processed ${streamCount} streams, extracted ${textParts.length} text fragments`);
     
-    // Method 2: Extract from text objects (BT...ET blocks)
-    const textObjectRegex = /BT\s+([\s\S]*?)\s+ET/g;
-    let textObjMatch;
-    let textObjCount = 0;
-    
-    while ((textObjMatch = textObjectRegex.exec(pdfData)) !== null) {
-      textObjCount++;
-      const textBlock = textObjMatch[1];
-      
-      // Extract all text in parentheses from this block
-      const textInParens = textBlock.matchAll(/\(((?:[^()\\]|\\.)*)\)/g);
-      for (const match of textInParens) {
-        if (match[1] && match[1].trim()) {
-          textParts.push(match[1]);
-        }
-      }
-    }
-    
-    console.log(`Found ${textObjCount} text objects (BT/ET blocks), total fragments: ${textParts.length}`);
-    
-    // Method 3: Global fallback - extract all parenthesized strings that look like text
-    if (textParts.length < 20) {
-      console.log('Low extraction rate, trying global text extraction...');
-      const globalTextRegex = /\(((?:[^()\\]|\\.){3,})\)/g;
-      let globalMatch;
-      
-      while ((globalMatch = globalTextRegex.exec(pdfData)) !== null) {
-        const text = globalMatch[1];
-        // Filter: must have mostly printable ASCII or common chars
-        const printableCount = (text.match(/[a-zA-Z0-9\s@.,;:()\-_]/g) || []).length;
-        if (printableCount > text.length * 0.5) {
-          textParts.push(text);
-        }
-      }
-      
-      console.log(`Global extraction added more fragments, total now: ${textParts.length}`);
-    }
-    
-    if (textParts.length === 0) {
-      throw new Error('No text found in PDF. The PDF may be image-based or use unsupported encoding.');
-    }
-    
-    // Decode PDF text strings
-    const decodedParts: string[] = [];
-    for (const part of textParts) {
-      let decoded = part;
-      
-      // Handle PDF string escape sequences
-      decoded = decoded
+    // Decode PDF string escapes
+    const decodedText = textParts.map(text => {
+      return text
         .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '\n')
+        .replace(/\\r/g, '\r')
         .replace(/\\t/g, '\t')
         .replace(/\\b/g, '\b')
         .replace(/\\f/g, '\f')
         .replace(/\\\(/g, '(')
         .replace(/\\\)/g, ')')
         .replace(/\\\\/g, '\\')
-        .replace(/\\'/g, "'")
-        .replace(/\\"/g, '"');
-      
-      // Handle octal escape sequences (\ddd)
-      decoded = decoded.replace(/\\([0-7]{1,3})/g, (_, oct) => {
-        const code = parseInt(oct, 8);
-        return code >= 32 && code <= 126 ? String.fromCharCode(code) : ' ';
-      });
-      
-      // Clean up control characters but keep newlines and tabs
-      decoded = decoded.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-      
-      if (decoded.trim().length > 0) {
-        decodedParts.push(decoded.trim());
-      }
-    }
+        .replace(/\\(\d{3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
+    });
     
-    console.log(`Decoded ${decodedParts.length} text parts`);
+    const finalText = decodedText.join(' ');
     
-    // Join all parts with spaces
-    let fullText = decodedParts.join(' ');
+    console.log("Final text length:", finalText.length, "characters");
+    console.log("Preview (first 500 chars):", finalText.substring(0, 500));
     
-    // Clean up the text
-    fullText = fullText
-      // Normalize whitespace
-      .replace(/\s+/g, ' ')
-      // Add spaces between camelCase
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      // Preserve line breaks for sections
-      .replace(/([a-z])\s+([A-Z][a-z])/g, '$1\n$2')
-      .trim();
+    // Calculate text quality
+    const alphanumeric = (finalText.match(/[a-zA-Z0-9]/g) || []).length;
+    const quality = finalText.length > 0 ? (alphanumeric / finalText.length) * 100 : 0;
+    console.log(`Text quality score: ${quality.toFixed(1)}% alphanumeric`);
     
-    console.log(`Final text length: ${fullText.length} characters`);
-    console.log(`Preview (first 500 chars): ${fullText.substring(0, 500)}`);
-    
-    if (fullText.length < 50) {
-      throw new Error(`Extracted text too short (${fullText.length} chars). PDF may be image-based or corrupted.`);
-    }
-    
-    // Validate text quality - check for reasonable character distribution
-    const alphaNumCount = (fullText.match(/[a-zA-Z0-9]/g) || []).length;
-    const textQuality = alphaNumCount / fullText.length;
-    
-    console.log(`Text quality score: ${(textQuality * 100).toFixed(1)}% alphanumeric`);
-    
-    if (textQuality < 0.3) {
-      console.warn('Low text quality detected, extraction may be unreliable');
-    }
-    
-    return fullText;
-    
+    return finalText;
   } catch (error) {
-    console.error('PDF extraction error:', error);
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`PDF text extraction failed: ${errorMsg}`);
+    console.error("Error extracting text from PDF:", error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    throw new Error(`PDF extraction failed: ${errorMsg}`);
   }
 }
 
+// Main parsing function
 async function parseCVData(arrayBuffer: ArrayBuffer): Promise<ParsedCV> {
-  console.log('Starting CV parsing...');
+  console.log("Starting CV parsing...");
   
-  try {
-    const text = await extractTextFromPDF(arrayBuffer);
-    console.log('Text extracted, length:', text.length);
-    
-    if (!text || text.length < 50) {
-      throw new Error('Extracted text is too short or empty');
+  // Extract raw text from PDF
+  const rawText = await extractTextFromPDF(arrayBuffer);
+  
+  // Clean the extracted text
+  const cleanedText = cleanExtractedText(rawText);
+  console.log("Cleaned text length:", cleanedText.length);
+  console.log("Cleaned preview (first 300 chars):", cleanedText.substring(0, 300));
+  
+  // Extract all information from cleaned text
+  const emails = extractEmail(cleanedText);
+  const phones = extractPhones(cleanedText);
+  const links = extractLinks(cleanedText);
+  const name = extractName(cleanedText);
+  const extractedSkills = extractSkills(cleanedText);
+  
+  console.log("Extracted emails:", emails);
+  console.log("Extracted phones:", phones);
+  console.log("Extracted links:", links);
+  console.log("Extracted name:", name);
+  console.log("Extracted skills count:", extractedSkills.length);
+  
+  // Parse links for GitHub and LinkedIn
+  let github = null;
+  let linkedin = null;
+  
+  for (const link of links) {
+    if (link.includes('github.com')) {
+      github = link;
+    } else if (link.includes('linkedin.com')) {
+      linkedin = link;
     }
-    
-    const emails = extractEmail(text);
-    const phones = extractPhones(text);
-    const links = extractLinks(text);
-    const name = extractName(text);
-    const skills = extractSkills(text);
-    
-    const parsedData: ParsedCV = {
-      name: name || 'Unknown Candidate',
-      email: emails[0] || null,
-      phone: phones[0] || null,
-      github: links.find(l => l.includes('github')) || null,
-      linkedin: links.find(l => l.includes('linkedin')) || null,
-      extractedSkills: skills,
-    };
-    
-    console.log('Parsing completed:', parsedData);
-    return parsedData;
-  } catch (error) {
-    console.error('Error in parseCVData:', error);
-    throw error;
   }
+  
+  const result: ParsedCV = {
+    name,
+    email: emails.length > 0 ? emails[0] : null,
+    phone: phones.length > 0 ? phones[0] : null,
+    github,
+    linkedin,
+    extractedSkills,
+  };
+  
+  console.log("Successfully parsed CV:", JSON.stringify(result, null, 2));
+  
+  return result;
 }
 
+// Serverless function handler
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log('Starting CV parsing request...');
+
   try {
-    console.log('Starting CV parsing request...');
     const formData = await req.formData();
     const file = formData.get('file') as File;
 
@@ -646,31 +489,37 @@ serve(async (req) => {
       throw new Error('No file provided');
     }
 
-    console.log('File received:', file.name, 'Size:', file.size);
+    console.log(`File received: ${file.name} Size: ${file.size}`);
 
     const arrayBuffer = await file.arrayBuffer();
-    const parsedCV = await parseCVData(arrayBuffer);
+    const parsed = await parseCVData(arrayBuffer);
 
-    console.log('Successfully parsed CV:', parsedCV);
+    console.log('Parsing completed:', JSON.stringify(parsed));
 
     return new Response(
-      JSON.stringify(parsedCV),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+      JSON.stringify(parsed),
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
       }
     );
-
   } catch (error) {
     console.error('Error parsing CV:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Failed to parse CV';
+    const errorDetails = error instanceof Error ? error.toString() : String(error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined
+      JSON.stringify({
+        error: errorMsg,
+        details: errorDetails,
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
       }
     );
   }
