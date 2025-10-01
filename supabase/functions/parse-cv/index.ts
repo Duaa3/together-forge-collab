@@ -30,18 +30,33 @@ serve(async (req) => {
 
     console.log('File received:', file.name, 'Size:', file.size);
 
-    // Use Lovable AI to extract structured information directly from PDF
-    // This uses Gemini's vision capabilities to handle any PDF format
+    // Extract text from PDF
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    
+    // Simple but effective: extract all text between parentheses (PDF text format)
+    // and between text markers, then let AI sort it out
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    const pdfText = decoder.decode(bytes);
+    
+    console.log('Extracting text from PDF...');
+    
+    // Extract text in parentheses (most common PDF text format)
+    const textMatches = pdfText.match(/\(([^)]+)\)/g) || [];
+    let extractedText = textMatches
+      .map(m => m.slice(1, -1))
+      .join(' ')
+      .replace(/\\[nrt]/g, ' ')
+      .replace(/\s+/g, ' ');
+    
+    console.log('Extracted text preview:', extractedText.slice(0, 500));
+    console.log('Total extracted length:', extractedText.length);
+
+    // Use Lovable AI to intelligently extract structured information
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
-
-    // Convert PDF to base64 for Gemini vision analysis
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-    console.log('Sending PDF to AI for visual analysis...');
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -54,57 +69,71 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a professional CV/Resume parser. Extract information ACCURATELY from the CV document.
+            content: `You are an expert CV parser. The text you receive is extracted from a PDF and may be messy or have formatting issues.
+
+YOUR TASK: Extract accurate, clean information from noisy CV text.
 
 EXTRACTION RULES:
 
-1. NAME: Extract the full name (First Last or First Middle Last) from the top of the CV
+📝 NAME: 
+- Look for a person's full name (typically 2-4 words, capitalized)
+- Usually appears at the very beginning
+- Format: "FirstName LastName" or "FirstName MiddleName LastName"
 
-2. EMAIL: Extract the email address - must be a valid format with @ and domain
+📧 EMAIL:
+- Must contain @ symbol and valid domain (.com, .org, .edu, etc.)
+- Format: something@domain.com
 
-3. PHONE: Extract phone number in any standard format
+📞 PHONE:
+- Numbers with + or () or - separators
+- At least 10 digits
+- Formats: +1234567890, (123) 456-7890, 123-456-7890
 
-4. LINKS: Extract professional links:
-   - LinkedIn profiles
-   - GitHub profiles  
-   - Portfolio websites
-   - Professional social media
+🔗 LINKS:
+- LinkedIn: linkedin.com/in/username
+- GitHub: github.com/username  
+- Portfolio websites
+- Full URLs only
 
-5. SKILLS: Extract ALL technical skills, but be selective:
-   ✅ INCLUDE:
-   - Programming languages (Python, JavaScript, Java, C++, etc.)
-   - Frameworks (React, Angular, Vue, Django, Spring, etc.)
-   - Databases (SQL, PostgreSQL, MongoDB, MySQL, etc.)
-   - Cloud/DevOps (AWS, Azure, Docker, Kubernetes, etc.)
-   - Tools (Git, JIRA, etc.)
-   - Certifications
-   
-   ❌ EXCLUDE:
-   - Generic words
-   - Company names (unless they're technologies)
-   - Random text or partial words
-   - Skills shorter than 2 characters (except: C#, Go, R)
-   
-QUALITY RULES:
-- Be accurate - only extract what you clearly see
-- No duplicates
-- No PDF artifacts or noise
-- If uncertain, omit rather than guess`
+💼 SKILLS (MOST IMPORTANT):
+Only extract REAL technical skills from these categories:
+
+✅ Programming Languages:
+JavaScript, TypeScript, Python, Java, C++, C#, Ruby, Go, Rust, Swift, Kotlin, PHP
+
+✅ Frontend Frameworks:
+React, Angular, Vue, Svelte, Next.js, Nuxt.js
+
+✅ Backend Frameworks:
+Node.js, Express, Django, Flask, Spring, .NET, FastAPI, Laravel
+
+✅ Databases:
+PostgreSQL, MySQL, MongoDB, Redis, Oracle, SQL Server, Supabase, Firebase
+
+✅ Cloud & DevOps:
+AWS, Azure, GCP, Docker, Kubernetes, Jenkins, CI/CD, Terraform
+
+✅ Tools & Others:
+Git, GitHub, GitLab, JIRA, VS Code, Linux, Agile, Scrum
+
+❌ NEVER extract:
+- Random words or partial words
+- PDF artifact text
+- Company names (unless it's a tool/platform)
+- Common words like "experience", "education"
+- Anything less than 2 characters (except: R, C, Go)
+
+QUALITY OVER QUANTITY:
+- Only extract what you're confident about
+- Each skill should appear once
+- If something looks wrong, skip it
+- Empty fields are better than wrong data`
           },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Extract structured information from this CV/Resume document. Focus on accuracy and only extract clearly visible information.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:application/pdf;base64,${base64Data}`
-                }
-              }
-            ]
+            content: `Parse this CV text and extract structured information. The text is messy from PDF extraction, so focus on finding real data patterns:
+
+${extractedText.slice(0, 30000)}`
           }
         ],
         tools: [
