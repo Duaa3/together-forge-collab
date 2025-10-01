@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, TrendingUp, Users, Target, BarChart3 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { ArrowLeft, TrendingUp, Users, Target, BarChart3, RefreshCw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,6 +14,9 @@ export default function HRAnalyticsDashboard() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<any>(null);
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [processStatus, setProcessStatus] = useState('');
 
   useEffect(() => {
     fetchAnalytics();
@@ -28,10 +32,10 @@ export default function HRAnalyticsDashboard() {
         .select(`
           *,
           ml_scores (
-            technical_fit_score,
-            experience_match_score,
-            growth_potential_score,
-            cultural_fit_score,
+            technical_fit,
+            experience_match,
+            growth_potential,
+            cultural_fit,
             overall_score
           )
         `);
@@ -63,6 +67,77 @@ export default function HRAnalyticsDashboard() {
     }
   };
 
+  const processCandidates = async () => {
+    try {
+      setProcessing(true);
+      setProgress(0);
+      setProcessStatus('Starting batch processing...');
+
+      // Get total candidate count
+      const { count } = await supabase
+        .from('candidates')
+        .select('*', { count: 'exact', head: true });
+
+      const totalCandidates = count || 0;
+      const batchSize = 5;
+      let offset = 0;
+      let totalProcessed = 0;
+
+      while (true) {
+        setProcessStatus(`Processing candidates ${offset + 1} to ${Math.min(offset + batchSize, totalCandidates)}...`);
+
+        const { data, error } = await supabase.functions.invoke('batch-process-candidates', {
+          body: { batchSize, offset }
+        });
+
+        if (error) {
+          console.error('Batch processing error:', error);
+          toast({
+            title: 'Processing Error',
+            description: error.message || 'Failed to process candidates',
+            variant: 'destructive',
+          });
+          break;
+        }
+
+        totalProcessed += data.processed;
+        const progressPercent = Math.min((totalProcessed / totalCandidates) * 100, 100);
+        setProgress(progressPercent);
+
+        if (data.errors && data.errors.length > 0) {
+          console.warn('Processing errors:', data.errors);
+        }
+
+        if (data.completed) {
+          setProcessStatus(`Completed! Processed ${totalProcessed} candidates.`);
+          toast({
+            title: 'Processing Complete',
+            description: `Successfully processed ${totalProcessed} candidates with AI analysis.`,
+          });
+          
+          // Refresh analytics
+          await fetchAnalytics();
+          break;
+        }
+
+        offset = data.nextOffset;
+        
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+    } catch (error) {
+      console.error('Error processing candidates:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to process candidates',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const processAnalyticsData = (candidates: any[], marketData: any[]) => {
     // Skill distribution
     const skillCounts: Record<string, number> = {};
@@ -87,10 +162,10 @@ export default function HRAnalyticsDashboard() {
     // Average scores
     const candidatesWithScores = candidates.filter(c => c.ml_scores && c.ml_scores.length > 0);
     const avgScores = {
-      technical: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.technical_fit_score || 0), 0) / candidatesWithScores.length || 0,
-      experience: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.experience_match_score || 0), 0) / candidatesWithScores.length || 0,
-      growth: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.growth_potential_score || 0), 0) / candidatesWithScores.length || 0,
-      cultural: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.cultural_fit_score || 0), 0) / candidatesWithScores.length || 0,
+      technical: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.technical_fit || 0), 0) / candidatesWithScores.length || 0,
+      experience: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.experience_match || 0), 0) / candidatesWithScores.length || 0,
+      growth: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.growth_potential || 0), 0) / candidatesWithScores.length || 0,
+      cultural: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.cultural_fit || 0), 0) / candidatesWithScores.length || 0,
     };
 
     return {
@@ -152,7 +227,29 @@ export default function HRAnalyticsDashboard() {
             <h1 className="text-3xl font-bold">AI Analytics Dashboard</h1>
             <p className="text-muted-foreground">Intelligent insights and market analytics</p>
           </div>
+          <Button 
+            onClick={processCandidates} 
+            disabled={processing}
+            size="lg"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${processing ? 'animate-spin' : ''}`} />
+            {processing ? 'Processing...' : 'Process All Candidates'}
+          </Button>
         </div>
+
+        {/* Processing Progress */}
+        {processing && (
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Processing Progress</span>
+                <span className="text-sm text-muted-foreground">{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} />
+              <p className="text-sm text-muted-foreground">{processStatus}</p>
+            </div>
+          </Card>
+        )}
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

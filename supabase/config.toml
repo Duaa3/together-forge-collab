@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.market-analytics]
 verify_jwt = true
+
+[functions.batch-process-candidates]
+verify_jwt = true
