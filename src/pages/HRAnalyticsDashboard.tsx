@@ -32,10 +32,10 @@ export default function HRAnalyticsDashboard() {
         .select(`
           *,
           ml_scores (
-            technical_fit,
-            experience_match,
-            growth_potential,
-            cultural_fit,
+            technical_fit_score,
+            experience_match_score,
+            growth_potential_score,
+            cultural_fit_score,
             overall_score
           )
         `);
@@ -162,10 +162,10 @@ export default function HRAnalyticsDashboard() {
     // Average scores
     const candidatesWithScores = candidates.filter(c => c.ml_scores && c.ml_scores.length > 0);
     const avgScores = {
-      technical: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.technical_fit || 0), 0) / candidatesWithScores.length || 0,
-      experience: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.experience_match || 0), 0) / candidatesWithScores.length || 0,
-      growth: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.growth_potential || 0), 0) / candidatesWithScores.length || 0,
-      cultural: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.cultural_fit || 0), 0) / candidatesWithScores.length || 0,
+      technical: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.technical_fit_score || 0), 0) / candidatesWithScores.length || 0,
+      experience: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.experience_match_score || 0), 0) / candidatesWithScores.length || 0,
+      growth: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.growth_potential_score || 0), 0) / candidatesWithScores.length || 0,
+      cultural: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.cultural_fit_score || 0), 0) / candidatesWithScores.length || 0,
     };
 
     return {

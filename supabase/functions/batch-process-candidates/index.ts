@@ -123,15 +123,16 @@ serve(async (req) => {
           .from('ml_scores')
           .insert({
             candidate_id: candidate.id,
-            technical_fit: scoringData.technicalFit,
-            experience_match: scoringData.experienceMatch,
-            growth_potential: scoringData.growthPotential,
-            cultural_fit: scoringData.culturalFit,
+            technical_fit_score: scoringData.technicalFit,
+            experience_match_score: scoringData.experienceMatch,
+            growth_potential_score: scoringData.growthPotential,
+            cultural_fit_score: scoringData.culturalFit,
             overall_score: scoringData.overallScore,
-            confidence_lower: scoringData.confidence.lower,
-            confidence_upper: scoringData.confidence.upper,
+            confidence_interval: {
+              lower: scoringData.confidence.lower,
+              upper: scoringData.confidence.upper
+            },
             feature_importance: scoringData.featureImportance,
-            reasoning: scoringData.reasoning,
           });
 
         if (insertError) {
