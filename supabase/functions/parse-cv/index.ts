@@ -47,72 +47,156 @@ const SKILLS_DICT = [
   'serverless', 'websocket', 'oauth', 'jwt', 'soap', 'xml', 'json', 'iot'
 ];
 
-// Advanced extraction functions
+// Advanced extraction functions with improved patterns
 function extractEmail(text: string): string[] {
-  const matches = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+  // More comprehensive email pattern
+  const emailPattern = /[\w\.-]+@[\w\.-]+\.\w{2,}/gi;
+  const matches = text.match(emailPattern);
   return matches ? [...new Set(matches)] : [];
 }
 
 function extractPhones(text: string): string[] {
-  // Covers international formats including Oman (+968)
-  const matches = text.match(/(?:\+?968[-\s]?)?\b[279]\d{7,8}\b|(?:\+\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{3,4}[-\s]?\d{3,4}/g);
-  return matches ? [...new Set(matches)] : [];
+  const phonePatterns = [
+    // International format with + and country code
+    /\+\d{1,4}[\s.-]?\(?\d{1,4}\)?[\s.-]?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{0,4}/g,
+    // US format
+    /\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g,
+    // General format with dashes or spaces
+    /\d{2,4}[\s.-]\d{2,4}[\s.-]\d{2,4}[\s.-]?\d{0,4}/g,
+    // Compact format
+    /\b\d{8,15}\b/g
+  ];
+  
+  const allMatches = new Set<string>();
+  for (const pattern of phonePatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      matches.forEach(m => {
+        // Clean up the match
+        const cleaned = m.trim();
+        // Only add if it looks like a phone number (has enough digits)
+        if (cleaned.replace(/\D/g, '').length >= 7) {
+          allMatches.add(cleaned);
+        }
+      });
+    }
+  }
+  
+  return [...allMatches];
 }
 
 function extractLinks(text: string): string[] {
-  const matches = text.match(/https?:\/\/[^\s)]+/gi);
-  const unique = new Set(matches || []);
-  // Filter for professional domains
-  const professional = [...unique].filter(url => 
-    /(linkedin\.com|github\.com|researchgate\.net|ijrar\.org|portfolio|medium\.com|behance\.net|dribbble\.com|gitlab\.com|bitbucket\.org)/i.test(url)
-  );
-  return professional.length > 0 ? professional : [...unique];
+  const linkPatterns = [
+    // URLs with protocol
+    /https?:\/\/[^\s\)]+/gi,
+    // LinkedIn without protocol
+    /linkedin\.com\/in\/[^\s\)]+/gi,
+    // GitHub without protocol
+    /github\.com\/[^\s\)]+/gi,
+    // Generic domain patterns
+    /(?:www\.)?[\w-]+\.(?:com|net|org|io|dev)\/[^\s\)]+/gi
+  ];
+  
+  const allMatches = new Set<string>();
+  for (const pattern of linkPatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      matches.forEach(m => {
+        let url = m.trim();
+        // Add protocol if missing
+        if (!url.startsWith('http')) {
+          url = 'https://' + url;
+        }
+        allMatches.add(url);
+      });
+    }
+  }
+  
+  return [...allMatches];
 }
 
 function extractName(text: string): string {
-  // Look at first 10 lines for name patterns
-  const lines = text.split(/\r?\n/).slice(0, 10)
+  const lines = text.split(/\r?\n/)
     .map(l => l.trim())
     .filter(Boolean);
   
-  // Prefer lines with 2-4 capitalized words (typical name format)
-  const candidates = lines.filter(l => 
-    /^[A-Z][a-z]+(?:\s+[A-Z][a-z'-]+){1,3}$/.test(l) &&
-    l.length > 5 &&
-    l.length < 50
-  );
-  
-  if (candidates.length > 0) {
-    return candidates[0];
+  // Strategy 1: Look for "Name:" label
+  const nameWithLabel = text.match(/(?:name|candidate)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z'-]+){1,3})/i);
+  if (nameWithLabel && nameWithLabel[1]) {
+    return nameWithLabel[1];
   }
   
-  // Fallback: first line with capital letters
-  const fallback = lines.find(l => 
-    /^[A-Z][a-z]/.test(l) &&
-    l.length > 3 &&
-    l.length < 50 &&
-    !/^(curriculum|resume|cv|profile|about|contact|education|experience|skills)/i.test(l)
-  );
+  // Strategy 2: First 15 lines, look for 2-4 capitalized words
+  const earlyLines = lines.slice(0, 15);
+  for (const line of earlyLines) {
+    // Match 2-4 capitalized words (flexible with middle initials)
+    if (/^[A-Z][a-z]+(?:\s+[A-Z]\.?)?(?:\s+[A-Z][a-z'-]+){1,2}$/i.test(line) &&
+        line.length > 4 && line.length < 60 &&
+        !/(resume|curriculum|cv|profile|contact|email|phone|address|education|experience|skills|objective)/i.test(line)) {
+      return line;
+    }
+  }
   
-  return fallback || '';
+  // Strategy 3: Look for capital letters pattern in first line
+  if (lines[0] && /[A-Z]/.test(lines[0]) && lines[0].length > 3 && lines[0].length < 60) {
+    const firstLine = lines[0];
+    if (!/^(resume|cv|curriculum)/i.test(firstLine)) {
+      return firstLine;
+    }
+  }
+  
+  return '';
 }
 
 function extractSkills(text: string): string[] {
   const foundSkills = new Set<string>();
   const lowerText = text.toLowerCase();
   
+  // Method 1: Match against skills dictionary
   for (const skill of SKILLS_DICT) {
-    // Escape special regex characters
     const escaped = skill.replace(/[+.^$*|{}()[\]\\]/g, '\\$&');
     const regex = new RegExp(`\\b${escaped}\\b`, 'i');
     
     if (regex.test(lowerText)) {
-      // Find the actual match to preserve original case
       const match = text.match(regex);
       if (match) {
-        foundSkills.add(match[0]);
+        foundSkills.add(skill.toLowerCase());
       }
     }
+  }
+  
+  // Method 2: Extract from "Skills" section
+  const skillsSectionMatch = text.match(/(?:skills|technical skills|technologies|competencies)[:\s]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
+  if (skillsSectionMatch) {
+    const skillsText = skillsSectionMatch[1];
+    // Split by common delimiters
+    const skillTokens = skillsText.split(/[,;|\n•·▪▫-]/);
+    skillTokens.forEach(token => {
+      const cleaned = token.trim().toLowerCase();
+      if (cleaned.length > 1 && cleaned.length < 30) {
+        // Check if it's a known skill or looks technical
+        if (SKILLS_DICT.some(s => s === cleaned) || 
+            /^[a-z0-9#+.-]+$/i.test(cleaned)) {
+          foundSkills.add(cleaned);
+        }
+      }
+    });
+  }
+  
+  // Method 3: Look for programming patterns (e.g., "Python, Java, C++")
+  const techPatterns = text.match(/\b(?:proficient in|experience with|worked with|using|including)\s*:?\s*([^.]+)/gi);
+  if (techPatterns) {
+    techPatterns.forEach(pattern => {
+      const tokens = pattern.split(/[,;|&]/);
+      tokens.forEach(token => {
+        const cleaned = token.replace(/^(?:proficient in|experience with|worked with|using|including)\s*:?\s*/i, '').trim().toLowerCase();
+        if (cleaned.length > 1 && cleaned.length < 30) {
+          if (SKILLS_DICT.some(s => s === cleaned)) {
+            foundSkills.add(cleaned);
+          }
+        }
+      });
+    });
   }
   
   return [...foundSkills];
@@ -161,6 +245,9 @@ async function parseCVData(arrayBuffer: ArrayBuffer): Promise<ParsedCV> {
     throw new Error('No text could be extracted from PDF');
   }
   
+  // Log first 500 chars of extracted text for debugging
+  console.log('Extracted text preview:', text.substring(0, 500));
+  
   // Extract information using regex/heuristics
   const emails = extractEmail(text);
   const phones = extractPhones(text);
@@ -170,10 +257,11 @@ async function parseCVData(arrayBuffer: ArrayBuffer): Promise<ParsedCV> {
   
   console.log('Extraction results:', {
     name,
-    emailCount: emails.length,
-    phoneCount: phones.length,
+    emails: emails.slice(0, 3),
+    phones: phones.slice(0, 3),
     linksCount: links.length,
-    skillsCount: skills.length
+    skillsCount: skills.length,
+    skills: skills.slice(0, 10)
   });
   
   return {
