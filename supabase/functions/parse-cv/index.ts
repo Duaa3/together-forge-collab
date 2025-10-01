@@ -14,6 +14,39 @@ interface ParsedCV {
   extractedSkills: string[];
 }
 
+// Clean PDF metadata and artifacts from text
+function cleanPDFMetadata(text: string): string {
+  // Remove common PDF metadata patterns aggressively
+  const metadataPatterns = [
+    /Skia\/PDF\s+\S+/gi,
+    /Google\s+Docs?\s+Renderer/gi,
+    /Adobe\s+Identity/gi,
+    /endstream\s+endobj/gi,
+    /\/Type\s+\/Font/gi,
+    /\/Subtype\s+\/Type\d+/gi,
+    /\/BaseFont\s+\/[A-Z]+\+\w+/gi,
+    /\/Encoding\s+\/\w+/gi,
+    /\/DescendantFonts/gi,
+    /\/ToUnicode/gi,
+    /\/Length\d?\s+\d+/gi,
+    /\/Filter\s+\/\w+/gi,
+    /\/FlateDecode/gi,
+    /<<[^>]*>>/g,
+    /\d+\s+0\s+obj/g,
+    /stream\s+[^a-zA-Z]*/gi,
+  ];
+  
+  let cleaned = text;
+  for (const pattern of metadataPatterns) {
+    cleaned = cleaned.replace(pattern, ' ');
+  }
+  
+  // Remove excessive whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+}
+
 const SKILLS_DICT = [
   // Programming Languages
   'javascript', 'js', 'typescript', 'ts', 'python', 'java', 'c++', 'cpp', 'c#', 'csharp',
@@ -213,136 +246,110 @@ function extractLinks(text: string): string[] {
 function extractName(text: string): string {
   console.log('Extracting name from text...');
   
-  // Clean text - remove file paths, metadata, PDF artifacts
-  const cleanText = text
-    .replace(/curriculum\s*vitae|resume|cv\s*\//gi, '')
-    .replace(/\.pdf|\.doc|\.docx/gi, '')
-    .replace(/\b(page|of)\s+\d+/gi, '')
-    .replace(/\b\d{4}[-/]\d{2}[-/]\d{2}\b/g, '') // Remove dates
-    .replace(/google\s*docs|renderer|skia|pdf\s*m\d+/gi, '') // Remove PDF artifacts
-    .trim();
+  // Clean metadata first
+  const cleaned = cleanPDFMetadata(text);
   
-  const lines = cleanText
-    .split(/[\n\r]+/)
-    .map(l => l.trim())
-    .filter(l => l.length > 2 && l.length < 100); // Filter reasonable line lengths
-  
+  const lines = cleaned.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   console.log(`Processing ${lines.length} lines for name extraction`);
   
-  // Common stop words to avoid
-  const stopWords = [
-    'resume', 'curriculum', 'vitae', 'profile', 'contact', 'objective',
-    'education', 'experience', 'skills', 'work history', 'employment',
-    'dear sir', 'dear madam', 'project manager', 'software engineer',
-    'january', 'february', 'march', 'april', 'may', 'june', 'july',
-    'august', 'september', 'october', 'november', 'december',
-    'google', 'docs', 'renderer', 'new skia', 'skia', 'pdf'
-  ];
+  // Score-based name extraction
+  const nameCandidates: { name: string; score: number; position: number }[] = [];
   
-  // Strategy 1: Look for explicit "Name:" label
-  for (const line of lines.slice(0, 20)) {
-    const labelMatch = line.match(/(?:name|full\s*name|candidate)\s*:?\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z'-]+){1,3})/i);
-    if (labelMatch && labelMatch[1]) {
-      const name = labelMatch[1].trim();
-      const hasStopWord = stopWords.some(sw => name.toLowerCase().includes(sw));
-      if (!hasStopWord) {
-        console.log(`Found name with label: ${name}`);
-        return name;
-      }
-    }
-  }
-  
-  // Strategy 2: First clean lines with proper name format (2-4 capitalized words)
-  for (const line of lines.slice(0, 25)) {
+  for (let i = 0; i < Math.min(15, lines.length); i++) {
+    const line = lines[i];
+    
     // Skip lines that are clearly not names
-    if (line.match(/^(http|www|email|phone|address|linkedin|github|\d+|@|\.com|\.net)/i)) continue;
-    if (line.length < 5 || line.length > 50) continue;
+    if (line.length < 3 || line.length > 60) continue;
+    if (/^[0-9]+$/.test(line)) continue;
+    if (/^[^a-zA-Z]*$/.test(line)) continue;
+    if (line.toLowerCase().includes('curriculum') || 
+        line.toLowerCase().includes('vitae') ||
+        line.toLowerCase().includes('resume') ||
+        line.toLowerCase().includes('cv')) continue;
     
-    // Check if line contains stop words
-    const hasStopWord = stopWords.some(sw => line.toLowerCase().includes(sw));
-    if (hasStopWord) continue;
+    let score = 0;
     
-    // Match 2-4 capitalized words (typical name format)
-    const nameMatch = line.match(/^([A-Z][a-z]+(?:\s+[A-Z]\.?)?(?:\s+[A-Z][a-z]+(?:-[A-Z][a-z]+)?){1,3})$/);
-    if (nameMatch && nameMatch[1]) {
-      const words = nameMatch[1].split(/\s+/).filter(w => w.length > 1 && !w.match(/^[A-Z]\.$/));
-      // Validate it looks like a real name (at least 2 words, each at least 2 chars)
-      if (words.length >= 2 && words.length <= 4 && words.every(w => w.length >= 2)) {
-        console.log(`Found name in early lines: ${nameMatch[1]}`);
-        return nameMatch[1].trim();
-      }
+    // Higher score for names at the very beginning
+    score += Math.max(0, 20 - i * 2);
+    
+    // Check if line matches name pattern (2-4 words, starts with capital)
+    const namePattern = /^[A-Z][a-z]+(?:\s+[A-Z][a-zA-Z-]+){1,4}$/;
+    if (namePattern.test(line)) {
+      score += 30;
+      console.log(`Found name pattern candidate (score ${score}): ${line}`);
+    }
+    
+    // Check for common name structures
+    const words = line.split(/\s+/);
+    if (words.length >= 2 && words.length <= 5) {
+      const allCapitalized = words.every(w => /^[A-Z]/.test(w));
+      if (allCapitalized) score += 20;
+    }
+    
+    // Penalize if contains special characters (except hyphens and apostrophes)
+    if (/[^a-zA-Z\s'-]/.test(line)) score -= 15;
+    
+    // Penalize very short or very long lines
+    if (line.length < 8) score -= 5;
+    if (line.length > 40) score -= 10;
+    
+    if (score > 0) {
+      nameCandidates.push({ name: line, score, position: i });
     }
   }
   
-  // Strategy 3: Look for name pattern in text
-  const beginning = lines.slice(0, 40).join(' ');
-  const namePatterns = [
-    /\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,})\b/, // Three names
-    /\b([A-Z][a-z]{2,}\s+[A-Z]\.\s+[A-Z][a-z]{2,})\b/, // First M. Last
-    /\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,})\b/, // Two names
-  ];
+  // Sort by score and return best candidate
+  nameCandidates.sort((a, b) => b.score - a.score);
   
-  for (const pattern of namePatterns) {
-    const matches = [...beginning.matchAll(new RegExp(pattern, 'g'))];
-    for (const match of matches) {
-      if (match && match[1]) {
-        const candidate = match[1].trim();
-        const hasStopWord = stopWords.some(sw => candidate.toLowerCase().includes(sw));
-        if (!hasStopWord && candidate.length >= 5) {
-          console.log(`Found name with pattern: ${candidate}`);
-          return candidate;
-        }
-      }
-    }
+  if (nameCandidates.length > 0) {
+    console.log(`Best name candidate (score ${nameCandidates[0].score}): ${nameCandidates[0].name}`);
+    return nameCandidates[0].name;
   }
   
-  console.log('Name not found, returning Unknown Candidate');
   return 'Unknown Candidate';
 }
 
 function extractSkills(text: string): string[] {
   console.log('Extracting skills...');
+  
+  // Clean metadata first
+  const cleaned = cleanPDFMetadata(text);
+  const normalizedText = cleaned.toLowerCase();
+  
+  // Escape special regex characters in skill names BEFORE using them
+  const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
   const foundSkills = new Set<string>();
-  const lowerText = text.toLowerCase();
   
-  // Blacklist of common false positives
-  const blacklist = ['cv', 'pdf', 'doc', 'page', 'new', 'old'];
-  
-  // Method 1: Direct matching from skills dictionary with better patterns
+  // Look for each skill in the dictionary with context
   for (const skill of SKILLS_DICT) {
-    // Skip blacklisted terms
-    if (blacklist.includes(skill.toLowerCase())) {
+    const skillLower = skill.toLowerCase();
+    const escapedSkill = escapeRegex(skillLower);
+    
+    // Skip single character skills unless they're common (C, R)
+    if (skillLower.length === 1 && !['c', 'r'].includes(skillLower)) {
       continue;
     }
     
-    // Skip very short skills that are likely false positives (except specific valid ones)
-    const validShortSkills = ['r', 'c', 'go', 'ai', 'ml', 'dl', 'cv', 'ui', 'ux'];
-    if (skill.length <= 2 && !validShortSkills.includes(skill.toLowerCase())) {
-      continue;
-    }
+    // Create context-aware pattern with escaped skill
+    const contextPattern = new RegExp(
+      `(?:^|\\s|[,.:;()])${escapedSkill}(?:$|\\s|[,.:;())])`,
+      'i'
+    );
     
-    // Escape special regex characters FIRST before using in any pattern
-    const escaped = skill.replace(/[+.^$*|{}()[\]\\]/g, '\\$&');
-    
-    // For very short skills, require stronger context
-    if (skill.length <= 3) {
-      // Check if it appears in a skills context (using escaped version)
-      const contextPatterns = [
-        new RegExp(`(?:skills?|technologies?|proficient|experience|knowledge).*?\\b${escaped}\\b`, 'i'),
-        new RegExp(`\\b${escaped}\\b.*?(?:developer|engineer|programming|language)`, 'i'),
-        new RegExp(`\\b${escaped}\\b\\s*[,;/&]`, 'i'), // Appears in a list
-      ];
-      
-      if (!contextPatterns.some(p => p.test(lowerText))) {
-        continue;
+    if (contextPattern.test(normalizedText)) {
+      // For single letter skills, require stronger context
+      if (skillLower.length === 1) {
+        const strongContextPattern = new RegExp(
+          `(?:language|programming|proficient|skilled|experience)\\s+(?:in\\s+)?${escapedSkill}(?:\\s|[,.:;]|$)`,
+          'i'
+        );
+        if (strongContextPattern.test(normalizedText)) {
+          foundSkills.add(skill);
+        }
+      } else {
+        foundSkills.add(skill);
       }
-    }
-    
-    // Use word boundaries but handle special cases like .net, c++, c#
-    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-    
-    if (regex.test(lowerText)) {
-      foundSkills.add(skill);
     }
   }
   
@@ -445,7 +452,16 @@ async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
       const isCompressed = /\/Filter\s*\/FlateDecode/.test(objectHeader);
       
       if (isCompressed) {
-        console.log(`Stream ${streamCount} is compressed, skipping for now`);
+        console.log(`Stream ${streamCount} is compressed, attempting to extract readable text`);
+        try {
+          // Try to extract any readable text fragments from compressed stream
+          const readableText = streamData.match(/[a-zA-Z0-9@.,;:'\-\s]{3,}/g);
+          if (readableText && readableText.length > 0) {
+            textParts.push(...readableText.filter(t => t.trim().length > 2));
+          }
+        } catch (e) {
+          console.log(`Failed to process compressed stream ${streamCount}:`, e);
+        }
         continue;
       }
       
