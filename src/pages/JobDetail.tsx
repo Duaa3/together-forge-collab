@@ -5,12 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe, ChevronDown, ChevronUp } from "lucide-react";
 import UploadCVDialog from "@/components/UploadCVDialog";
+import { AIExplanationPanel } from "@/components/AIExplanationPanel";
 import type { Database } from "@/integrations/supabase/types";
 
 type Job = Database["public"]["Tables"]["jobs"]["Row"];
 type Candidate = Database["public"]["Tables"]["candidates"]["Row"];
+type MLScoreRow = Database["public"]["Tables"]["ml_scores"]["Row"];
+
+interface MLScore {
+  candidate_id: string;
+  job_id: string;
+  technical_fit_score: number;
+  experience_match_score: number;
+  growth_potential_score: number;
+  cultural_fit_score: number;
+  overall_score: number;
+  confidence_interval?: { lower: number; upper: number };
+  feature_importance?: Record<string, number>;
+}
 
 const JobDetail = () => {
   const { jobId } = useParams();
@@ -18,6 +32,8 @@ const JobDetail = () => {
   const { toast } = useToast();
   const [job, setJob] = useState<Job | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [mlScores, setMlScores] = useState<Record<string, MLScore>>({});
+  const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -46,6 +62,32 @@ const JobDetail = () => {
 
       if (candidatesError) throw candidatesError;
       setCandidates(candidatesData || []);
+
+      // Fetch ML scores for all candidates
+      if (candidatesData && candidatesData.length > 0) {
+        const { data: scoresData, error: scoresError } = await supabase
+          .from("ml_scores")
+          .select("*")
+          .eq("job_id", jobId);
+
+        if (!scoresError && scoresData) {
+          const scoresMap: Record<string, MLScore> = {};
+          scoresData.forEach(score => {
+            scoresMap[score.candidate_id] = {
+              candidate_id: score.candidate_id,
+              job_id: score.job_id,
+              technical_fit_score: score.technical_fit_score,
+              experience_match_score: score.experience_match_score,
+              growth_potential_score: score.growth_potential_score,
+              cultural_fit_score: score.cultural_fit_score,
+              overall_score: score.overall_score,
+              confidence_interval: score.confidence_interval as any,
+              feature_importance: score.feature_importance as any,
+            };
+          });
+          setMlScores(scoresMap);
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -87,6 +129,18 @@ const JobDetail = () => {
     if (score >= 80) return "text-success";
     if (score >= 60) return "text-warning";
     return "text-destructive";
+  };
+
+  const toggleCandidateExpansion = (candidateId: string) => {
+    setExpandedCandidates(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(candidateId)) {
+        newSet.delete(candidateId);
+      } else {
+        newSet.add(candidateId);
+      }
+      return newSet;
+    });
   };
 
   if (loading) {
@@ -195,92 +249,139 @@ const JobDetail = () => {
           </Card>
         ) : (
           <div className="space-y-4">
-            {candidates.map((candidate) => (
-              <Card key={candidate.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h4 className="text-xl font-semibold mb-1">{candidate.name}</h4>
-                      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                        {candidate.email && (
-                          <span className="flex items-center gap-1">
-                            <Mail className="w-4 h-4" />
-                            {candidate.email}
-                          </span>
-                        )}
-                        {candidate.phone && (
-                          <span className="flex items-center gap-1">
-                            <Phone className="w-4 h-4" />
-                            {candidate.phone}
-                          </span>
+            {candidates.map((candidate) => {
+              const isExpanded = expandedCandidates.has(candidate.id);
+              const mlScore = mlScores[candidate.id];
+              
+              return (
+                <Card key={candidate.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h4 className="text-xl font-semibold mb-1">{candidate.name}</h4>
+                        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                          {candidate.email && (
+                            <span className="flex items-center gap-1">
+                              <Mail className="w-4 h-4" />
+                              {candidate.email}
+                            </span>
+                          )}
+                          {candidate.phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-4 h-4" />
+                              {candidate.phone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {getDecisionBadge(candidate.decision, candidate.match_score)}
+                        <div className="flex flex-col items-end mt-2">
+                          {mlScore ? (
+                            <>
+                              <div className={`text-3xl font-bold ${getScoreColor(mlScore.overall_score)}`}>
+                                {mlScore.overall_score}%
+                              </div>
+                              <span className="text-xs text-muted-foreground">AI Score</span>
+                            </>
+                          ) : candidate.match_score !== null ? (
+                            <div className={`text-3xl font-bold ${getScoreColor(candidate.match_score)}`}>
+                              {candidate.match_score}%
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <h5 className="font-semibold mb-2 text-sm">Extracted Skills</h5>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray(candidate.extracted_skills) && candidate.extracted_skills.length > 0 ? (
+                          (candidate.extracted_skills as string[]).map((skill, idx) => (
+                            <Badge key={idx} variant="outline">
+                              {skill}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No skills extracted</span>
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      {getDecisionBadge(candidate.decision, candidate.match_score)}
-                      {candidate.match_score !== null && (
-                        <div className={`text-3xl font-bold mt-2 ${getScoreColor(candidate.match_score)}`}>
-                          {candidate.match_score}%
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  <div className="mb-4">
-                    <h5 className="font-semibold mb-2 text-sm">Extracted Skills</h5>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.isArray(candidate.extracted_skills) && candidate.extracted_skills.length > 0 ? (
-                        (candidate.extracted_skills as string[]).map((skill, idx) => (
-                          <Badge key={idx} variant="outline">
-                            {skill}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground text-sm">No skills extracted</span>
-                      )}
-                    </div>
-                  </div>
+                    {(candidate.github || candidate.linkedin || candidate.portfolio) && (
+                      <div className="flex flex-wrap gap-3 pt-4 border-t mb-4">
+                        {candidate.github && (
+                          <a
+                            href={candidate.github}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sm text-primary hover:underline"
+                          >
+                            <Github className="w-4 h-4" />
+                            GitHub
+                          </a>
+                        )}
+                        {candidate.linkedin && (
+                          <a
+                            href={candidate.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sm text-primary hover:underline"
+                          >
+                            <Linkedin className="w-4 h-4" />
+                            LinkedIn
+                          </a>
+                        )}
+                        {candidate.portfolio && (
+                          <a
+                            href={candidate.portfolio}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sm text-primary hover:underline"
+                          >
+                            <Globe className="w-4 h-4" />
+                            Portfolio
+                          </a>
+                        )}
+                      </div>
+                    )}
 
-                  {(candidate.github || candidate.linkedin || candidate.portfolio) && (
-                    <div className="flex flex-wrap gap-3 pt-4 border-t">
-                      {candidate.github && (
-                        <a
-                          href={candidate.github}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-sm text-primary hover:underline"
+                    {mlScore && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => toggleCandidateExpansion(candidate.id)}
                         >
-                          <Github className="w-4 h-4" />
-                          GitHub
-                        </a>
-                      )}
-                      {candidate.linkedin && (
-                        <a
-                          href={candidate.linkedin}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-sm text-primary hover:underline"
-                        >
-                          <Linkedin className="w-4 h-4" />
-                          LinkedIn
-                        </a>
-                      )}
-                      {candidate.portfolio && (
-                        <a
-                          href={candidate.portfolio}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-sm text-primary hover:underline"
-                        >
-                          <Globe className="w-4 h-4" />
-                          Portfolio
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                          {isExpanded ? (
+                            <>
+                              Hide AI Analysis
+                              <ChevronUp className="w-4 h-4 ml-2" />
+                            </>
+                          ) : (
+                            <>
+                              View AI Analysis
+                              <ChevronDown className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </Button>
+
+                        {isExpanded && (
+                          <div className="mt-4">
+                            <AIExplanationPanel
+                              candidateName={candidate.name || 'Unknown'}
+                              mlScore={mlScore}
+                              reasoning={mlScore.feature_importance ? JSON.stringify(mlScore.feature_importance) : undefined}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </main>

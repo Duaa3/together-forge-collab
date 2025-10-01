@@ -2,3 +2,12 @@ project_id = "exwhaknuccersvfknprz"
 
 [functions.parse-cv]
 verify_jwt = false
+
+[functions.analyze-candidate-advanced]
+verify_jwt = true
+
+[functions.candidate-scoring-engine]
+verify_jwt = true
+
+[functions.market-analytics]
+verify_jwt = true

@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      candidate_embeddings: {
+        Row: {
+          candidate_id: string
+          created_at: string | null
+          cv_embedding: Json | null
+          id: string
+          skill_embeddings: Json
+          updated_at: string | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string | null
+          cv_embedding?: Json | null
+          id?: string
+          skill_embeddings: Json
+          updated_at?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string | null
+          cv_embedding?: Json | null
+          id?: string
+          skill_embeddings?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_embeddings_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: true
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       candidates: {
         Row: {
           cv_path: string | null
@@ -73,6 +108,51 @@ export type Database = {
           },
         ]
       }
+      feedback_data: {
+        Row: {
+          candidate_id: string
+          created_at: string | null
+          feedback_notes: string | null
+          hired: boolean | null
+          id: string
+          job_id: string
+          performance_rating: number | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string | null
+          feedback_notes?: string | null
+          hired?: boolean | null
+          id?: string
+          job_id: string
+          performance_rating?: number | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string | null
+          feedback_notes?: string | null
+          hired?: boolean | null
+          id?: string
+          job_id?: string
+          performance_rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_data_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_data_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           created_at: string
@@ -100,6 +180,126 @@ export type Database = {
           preferred_skills?: Json | null
           title?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      market_intelligence: {
+        Row: {
+          avg_salary_range: Json | null
+          created_at: string | null
+          demand_score: number | null
+          id: string
+          skill_name: string
+          supply_score: number | null
+          trend_direction: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_salary_range?: Json | null
+          created_at?: string | null
+          demand_score?: number | null
+          id?: string
+          skill_name: string
+          supply_score?: number | null
+          trend_direction?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_salary_range?: Json | null
+          created_at?: string | null
+          demand_score?: number | null
+          id?: string
+          skill_name?: string
+          supply_score?: number | null
+          trend_direction?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ml_scores: {
+        Row: {
+          candidate_id: string
+          confidence_interval: Json | null
+          created_at: string | null
+          cultural_fit_score: number
+          experience_match_score: number
+          feature_importance: Json | null
+          growth_potential_score: number
+          id: string
+          job_id: string
+          overall_score: number
+          technical_fit_score: number
+          updated_at: string | null
+        }
+        Insert: {
+          candidate_id: string
+          confidence_interval?: Json | null
+          created_at?: string | null
+          cultural_fit_score: number
+          experience_match_score: number
+          feature_importance?: Json | null
+          growth_potential_score: number
+          id?: string
+          job_id: string
+          overall_score: number
+          technical_fit_score: number
+          updated_at?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          confidence_interval?: Json | null
+          created_at?: string | null
+          cultural_fit_score?: number
+          experience_match_score?: number
+          feature_importance?: Json | null
+          growth_potential_score?: number
+          id?: string
+          job_id?: string
+          overall_score?: number
+          technical_fit_score?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ml_scores_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ml_scores_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_versions: {
+        Row: {
+          accuracy_metrics: Json | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          model_name: string
+          version: string
+        }
+        Insert: {
+          accuracy_metrics?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          model_name: string
+          version: string
+        }
+        Update: {
+          accuracy_metrics?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          model_name?: string
+          version?: string
         }
         Relationships: []
       }

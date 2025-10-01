@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, LogOut, Plus } from "lucide-react";
+import { Briefcase, LogOut, Plus, BarChart3 } from "lucide-react";
 import CreateJobDialog from "@/components/CreateJobDialog";
 
 interface Job {
@@ -65,6 +65,10 @@ const HRDashboard = () => {
             <h1 className="text-2xl font-bold">HR Dashboard</h1>
           </div>
           <div className="flex gap-2">
+            <Button onClick={() => navigate('/analytics')} variant="outline">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </Button>
             <Button onClick={() => setCreateJobOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create Job
