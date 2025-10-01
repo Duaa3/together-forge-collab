@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Upload, User } from "lucide-react";
+import { Loader2, Save, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
@@ -20,7 +20,6 @@ interface Profile {
   linkedin_url: string | null;
   portfolio_url: string | null;
   skills: string[] | null;
-  cv_url: string | null;
   avatar_url: string | null;
   bio: string | null;
 }
@@ -29,7 +28,6 @@ const ProfileSection = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -72,35 +70,6 @@ const ProfileSection = () => {
     }
   };
 
-  const getSignedCVUrl = async (filePath: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('cvs')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-      if (error) throw error;
-      return data.signedUrl;
-    } catch (error) {
-      console.error('Error getting signed URL:', error);
-      return null;
-    }
-  };
-
-  const handleViewCV = async () => {
-    if (!profile?.cv_url) return;
-    
-    const signedUrl = await getSignedCVUrl(profile.cv_url);
-    if (signedUrl) {
-      window.open(signedUrl, '_blank');
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to load CV",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleSave = async () => {
     if (!profile) return;
 
@@ -135,72 +104,6 @@ const ProfileSection = () => {
     }
   };
 
-  const handleCVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'application/pdf') {
-      toast({
-        title: "Error",
-        description: "Please upload a PDF file",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "Error",
-        description: "File size must be less than 5MB",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      if (profile?.cv_url) {
-        const oldPath = profile.cv_url.split('/').slice(-2).join('/');
-        await supabase.storage.from('cvs').remove([oldPath]);
-      }
-
-      const { error: uploadError } = await supabase.storage
-        .from('cvs')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      // Store the file path instead of URL
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ cv_url: fileName })
-        .eq('id', profile?.id);
-
-      if (updateError) throw updateError;
-
-      setProfile({ ...profile!, cv_url: fileName });
-
-      toast({
-        title: "Success",
-        description: "CV uploaded successfully!",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const calculateCompletion = () => {
     if (!profile) return 0;
     const fields = [
@@ -211,7 +114,6 @@ const ProfileSection = () => {
       profile.portfolio_url,
       profile.bio,
       profile.skills?.length,
-      profile.cv_url,
     ];
     const completed = fields.filter(Boolean).length;
     return Math.round((completed / fields.length) * 100);
@@ -343,7 +245,7 @@ const ProfileSection = () => {
         <Card>
           <CardHeader>
             <CardTitle>Skills</CardTitle>
-            <CardDescription>From your uploaded CV</CardDescription>
+            <CardDescription>Your professional skills</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
@@ -356,44 +258,6 @@ const ProfileSection = () => {
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>CV Document</CardTitle>
-          <CardDescription>Upload or update your resume (PDF only, max 5MB)</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" asChild disabled={uploading}>
-              <label className="cursor-pointer">
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    {profile.cv_url ? 'Update CV' : 'Upload CV'}
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={handleCVUpload}
-                  disabled={uploading}
-                />
-              </label>
-            </Button>
-            {profile.cv_url && (
-              <Button variant="secondary" onClick={handleViewCV}>
-                View Current CV
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
