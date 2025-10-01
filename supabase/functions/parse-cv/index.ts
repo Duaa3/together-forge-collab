@@ -128,6 +128,20 @@ serve(async (req) => {
     // Log preview for debugging
     console.log('Text preview (first 1000 chars):', textContent.slice(0, 1000));
 
+    // If extraction failed or text is too short, try alternate method
+    if (textContent.length < 100 && file.name.toLowerCase().endsWith('.pdf')) {
+      console.log('Low quality extraction, trying raw binary scan...');
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      const rawText = decoder.decode(uint8Array);
+      
+      // Extract any printable ASCII sequences
+      const printableMatches = rawText.match(/[\x20-\x7E]{3,}/g);
+      if (printableMatches) {
+        textContent = printableMatches.join(' ');
+        console.log('Recovered text from binary scan:', textContent.length, 'chars');
+      }
+    }
+
     // Use Lovable AI to extract structured information
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -145,26 +159,48 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert CV/Resume parser specialized in extracting information from noisy or poorly formatted text.
+            content: `You are an AGGRESSIVE CV parser. Your job is to extract EVERY piece of information from messy CV text.
 
-CRITICAL EXTRACTION RULES:
-1. NAME: Look for capitalized full names at the start, near "CV", "Resume", or after "Name:"
-2. EMAIL: Find patterns with @ symbol (e.g., name@domain.com)
-3. PHONE: Find number sequences with + country codes, dashes, spaces, or parentheses
-4. LINKS: Extract any URLs or domains (linkedin.com, github.com, etc.)
-5. SKILLS: Extract ANY technical, professional, or soft skills mentioned throughout the text
+EXTRACTION PRIORITY:
+1. NAME: Look for ANY capitalized words that could be a name (First Last, or full name format). Check:
+   - Top of document
+   - After words like "CV", "Resume", "Name", "Curriculum Vitae"
+   - Any line with 2-3 capitalized words in sequence
 
-IMPORTANT:
-- Work with fragmented or noisy text - piece together information
-- If text is garbled, look for partial matches (e.g., "python", "java", "communication")
-- Extract skills even if they appear in lists, sentences, or mixed with other text
-- Common skill categories: programming languages, frameworks, tools, soft skills, certifications
-- Don't invent information - only extract what's present
-- If truly nothing is found for a field, return empty string/array`
+2. EMAIL: Find ANY text with @ symbol and domain extension (.com, .net, etc.)
+
+3. PHONE: Find ANY number sequence that looks like a phone:
+   - With + and country code
+   - 10+ digits with dashes, spaces, parentheses
+   - Format: +XXX XXXXXXXXXX or (XXX) XXX-XXXX
+
+4. LINKS: Extract ANY URLs or web addresses:
+   - Full URLs (https://, http://)
+   - Domain names (linkedin.com/in/..., github.com/...)
+   - Even partial URLs
+
+5. SKILLS (MOST IMPORTANT): Extract EVERYTHING that could be a skill:
+   - Programming: Python, Java, JavaScript, C++, C#, PHP, Ruby, Go, Rust, etc.
+   - Frameworks: React, Angular, Vue, Django, Flask, Spring, .NET, etc.
+   - Databases: SQL, MySQL, PostgreSQL, MongoDB, Redis, Oracle, etc.
+   - Cloud: AWS, Azure, GCP, Docker, Kubernetes, etc.
+   - Tools: Git, JIRA, Excel, Office, Photoshop, etc.
+   - Soft skills: Communication, Leadership, Teamwork, Problem-solving, etc.
+   - Certifications: AWS Certified, PMP, CISSP, etc.
+   - Domain knowledge: Machine Learning, AI, Data Analysis, Security, etc.
+
+RULES:
+- Be EXTREMELY liberal with skill extraction
+- Include ANY technical term or tool mentioned
+- Include soft skills and personal qualities
+- Don't worry about duplicates - extract everything
+- If text is garbled, extract individual recognizable words
+- NEVER return empty arrays for skills unless absolutely nothing technical is mentioned
+- Prioritize finding SOMETHING over finding nothing`
           },
           {
             role: 'user',
-            content: `Parse this CV text and extract all information. The text may be fragmented or noisy, so be thorough:\n\n${textContent.slice(0, 25000)}`
+            content: `AGGRESSIVELY extract ALL information from this CV. Extract every possible skill, even if uncertain:\n\n${textContent.slice(0, 30000)}`
           }
         ],
         tools: [
