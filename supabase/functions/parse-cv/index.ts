@@ -16,40 +16,143 @@ interface ParsedCV {
 
 const SKILLS_DICT = [
   // Programming Languages
-  'javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'ruby', 'go', 'rust',
-  'swift', 'kotlin', 'php', 'scala', 'r', 'perl', 'dart', 'objective-c', 'c',
-  // Frontend
-  'react', 'angular', 'vue', 'svelte', 'next.js', 'nuxt.js', 'jquery', 'bootstrap',
-  'tailwind', 'html', 'css', 'sass', 'less', 'webpack', 'vite', 'redux', 'mobx', 'streamlit',
-  // Backend
-  'node.js', 'express', 'django', 'flask', 'spring', 'spring boot', '.net', 'fastapi',
-  'laravel', 'ruby on rails', 'asp.net', 'graphql', 'rest', 'restful', 'api', 'nestjs', 'swagger',
-  // Databases
-  'postgresql', 'mysql', 'mongodb', 'redis', 'oracle', 'sql server', 'supabase',
-  'firebase', 'dynamodb', 'cassandra', 'sqlite', 'mariadb', 'sql', 'nosql', 'postgres',
-  // Cloud & DevOps
-  'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins', 'ci/cd', 'terraform',
-  'ansible', 'circleci', 'gitlab ci', 'github actions', 'heroku', 'vercel', 'netlify',
-  // Tools & Version Control
-  'git', 'github', 'gitlab', 'bitbucket', 'jira', 'vs code', 'visual studio code', 'intellij', 'linux', 'unix',
-  'bash', 'powershell', 'vim', 'emacs', 'postman', 'trello', 'slack',
-  // Methodologies
-  'agile', 'scrum', 'kanban', 'devops', 'tdd', 'bdd', 'solid',
-  // Design & UI/UX
-  'figma', 'adobe xd', 'sketch', 'photoshop', 'illustrator', 'invision',
-  // AI & Data Science
-  'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'pandas', 'numpy',
-  'scikit-learn', 'keras', 'opencv', 'nlp', 'computer vision', 'data science', 'ml', 'ai',
-  'big data', 'hadoop', 'spark', 'tableau', 'power bi',
-  // Other Technologies
-  'elasticsearch', 'rabbitmq', 'kafka', 'nginx', 'apache', 'microservices',
-  'serverless', 'websocket', 'oauth', 'jwt', 'soap', 'xml', 'json', 'iot'
+  'javascript', 'js', 'typescript', 'ts', 'python', 'java', 'c++', 'cpp', 'c#', 'csharp',
+  'ruby', 'php', 'swift', 'kotlin', 'go', 'golang', 'rust', 'scala', 'r', 'matlab',
+  'perl', 'shell', 'bash', 'powershell', 'objective-c', 'dart', 'elixir', 'haskell',
+  'lua', 'assembly', 'c', 'vb.net', 'f#', 'clojure', 'erlang', 'groovy',
+  
+  // Web Frontend
+  'html', 'html5', 'css', 'css3', 'sass', 'scss', 'less', 'tailwind', 'tailwindcss',
+  'bootstrap', 'material-ui', 'mui', 'chakra ui', 'ant design', 'semantic ui',
+  'react', 'reactjs', 'react.js', 'angular', 'angularjs', 'vue', 'vuejs', 'vue.js',
+  'svelte', 'ember', 'backbone', 'jquery', 'next.js', 'nextjs', 'nuxt.js', 'nuxtjs',
+  'gatsby', 'remix', 'astro', 'webpack', 'vite', 'rollup', 'parcel', 'babel', 'turbopack',
+  'redux', 'mobx', 'zustand', 'recoil', 'context api', 'react query', 'swr', 'tanstack query',
+  'styled-components', 'emotion', 'css modules', 'postcss',
+  
+  // Web Backend
+  'node.js', 'nodejs', 'express', 'expressjs', 'nestjs', 'fastify', 'koa', 'hapi',
+  'django', 'flask', 'fastapi', 'spring', 'spring boot', 'asp.net', '.net core', '.net',
+  'laravel', 'symfony', 'codeigniter', 'yii', 'cakephp',
+  'rails', 'ruby on rails', 'sinatra', 'gin', 'fiber', 'echo', 'chi',
+  'actix', 'axum', 'rocket', 'warp',
+  
+  // Mobile Development
+  'react native', 'flutter', 'ionic', 'xamarin', 'cordova', 'phonegap', 'capacitor',
+  'swift ui', 'swiftui', 'jetpack compose', 'android', 'ios', 'kotlin multiplatform',
+  
+  // Databases & Data
+  'sql', 'mysql', 'postgresql', 'postgres', 'mongodb', 'mongo', 'redis', 'cassandra',
+  'oracle', 'sqlite', 'mariadb', 'dynamodb', 'couchdb', 'neo4j', 'graphdb', 'arangodb',
+  'elasticsearch', 'solr', 'memcached', 'influxdb', 'timescaledb', 'cockroachdb',
+  'firebase', 'firestore', 'supabase', 'planetscale', 'neon', 'turso',
+  'prisma', 'typeorm', 'sequelize', 'mongoose', 'knex', 'drizzle',
+  'sql alchemy', 'sqlalchemy', 'hibernate', 'entity framework', 'dapper',
+  'nosql', 'sql server', 'mssql', 'db2',
+  
+  // Cloud Platforms
+  'aws', 'amazon web services', 'azure', 'microsoft azure', 'gcp', 'google cloud',
+  'heroku', 'digitalocean', 'linode', 'vultr', 'netlify', 'vercel', 'cloudflare',
+  'railway', 'render', 'fly.io', 'deno deploy',
+  
+  // Cloud Services
+  'ec2', 's3', 'lambda', 'rds', 'dynamodb', 'cloudfront', 'route53', 'elb', 'alb',
+  'ecs', 'eks', 'fargate', 'sqs', 'sns', 'cloudwatch', 'iam', 'cognito',
+  'azure functions', 'azure devops', 'azure ad', 'blob storage', 'azure sql',
+  'compute engine', 'cloud functions', 'cloud run', 'bigquery', 'cloud storage',
+  'app engine', 'cloud sql', 'pub/sub',
+  
+  // DevOps & CI/CD
+  'docker', 'kubernetes', 'k8s', 'jenkins', 'gitlab', 'gitlab ci', 'github actions',
+  'circleci', 'travis ci', 'bitbucket pipelines', 'azure pipelines', 'teamcity',
+  'terraform', 'ansible', 'puppet', 'chef', 'saltstack', 'vagrant', 'packer',
+  'helm', 'argocd', 'flux', 'tekton', 'spinnaker', 'rancher', 'openshift',
+  'ci/cd', 'devops', 'gitops', 'infrastructure as code', 'iac', 'continuous integration',
+  'continuous deployment', 'continuous delivery',
+  
+  // Monitoring & Logging
+  'prometheus', 'grafana', 'datadog', 'new relic', 'splunk', 'elk stack', 'elk',
+  'logstash', 'kibana', 'fluentd', 'sentry', 'rollbar', 'bugsnag',
+  'pagerduty', 'opsgenie', 'cloudwatch', 'stackdriver', 'application insights',
+  
+  // Testing
+  'jest', 'mocha', 'chai', 'jasmine', 'karma', 'cypress', 'playwright', 'testcafe',
+  'selenium', 'webdriver', 'puppeteer', 'pytest', 'unittest', 'junit', 'testng',
+  'rspec', 'phpunit', 'vitest', 'testing library', 'react testing library',
+  'unit testing', 'integration testing', 'e2e testing', 'tdd', 'bdd',
+  'test automation', 'qa', 'quality assurance',
+  
+  // API & Integration
+  'rest api', 'restful', 'rest', 'graphql', 'grpc', 'soap', 'websocket', 'socket.io',
+  'api design', 'microservices', 'service mesh', 'api gateway', 'oauth', 'oauth2',
+  'jwt', 'openapi', 'swagger', 'postman', 'insomnia', 'api development',
+  
+  // Version Control
+  'git', 'github', 'gitlab', 'bitbucket', 'svn', 'mercurial', 'perforce',
+  'git flow', 'trunk based development', 'version control',
+  
+  // Project Management
+  'jira', 'confluence', 'trello', 'asana', 'monday', 'notion', 'clickup', 'linear',
+  'agile', 'scrum', 'kanban', 'waterfall', 'lean', 'safe', 'xp', 'extreme programming',
+  'project management', 'product management', 'stakeholder management',
+  
+  // AI & Machine Learning
+  'machine learning', 'ml', 'deep learning', 'dl', 'nlp', 'natural language processing',
+  'computer vision', 'cv', 'tensorflow', 'pytorch', 'keras', 'scikit-learn', 'sklearn',
+  'pandas', 'numpy', 'scipy', 'matplotlib', 'seaborn', 'plotly', 'dask',
+  'opencv', 'yolo', 'transformer', 'bert', 'gpt', 'llm', 'langchain', 'llamaindex',
+  'hugging face', 'huggingface', 'stable diffusion', 'gan', 'cnn', 'rnn', 'lstm',
+  'reinforcement learning', 'supervised learning', 'unsupervised learning',
+  'ai', 'artificial intelligence', 'neural networks', 'data science',
+  'jupyter', 'colab', 'kaggle',
+  
+  // Data Engineering
+  'etl', 'data pipeline', 'data warehouse', 'data lake', 'big data', 'data engineering',
+  'apache spark', 'spark', 'hadoop', 'kafka', 'airflow', 'luigi', 'prefect', 'dagster',
+  'dbt', 'snowflake', 'redshift', 'bigquery', 'databricks', 'delta lake',
+  'data modeling', 'data visualization', 'tableau', 'power bi', 'looker', 'metabase',
+  
+  // Security
+  'security', 'cybersecurity', 'infosec', 'penetration testing', 'ethical hacking',
+  'owasp', 'ssl', 'tls', 'encryption', 'authentication', 'authorization',
+  'oauth', 'saml', 'ldap', 'active directory', 'vault', 'secrets management',
+  'devsecops', 'security testing', 'vulnerability assessment',
+  
+  // Blockchain
+  'blockchain', 'ethereum', 'solidity', 'web3', 'smart contracts', 'defi',
+  'nft', 'cryptocurrency', 'bitcoin', 'hyperledger', 'solana', 'polygon',
+  
+  // Design & UX
+  'ui', 'ux', 'ui/ux', 'figma', 'sketch', 'adobe xd', 'invision', 'zeplin', 'framer',
+  'photoshop', 'illustrator', 'after effects', 'user experience', 'user interface',
+  'wireframing', 'prototyping', 'design systems', 'interaction design',
+  
+  // Other Tools
+  'linux', 'unix', 'windows', 'macos', 'vim', 'emacs', 'vscode', 'visual studio',
+  'intellij', 'pycharm', 'webstorm', 'sublime', 'atom', 'eclipse',
+  'nginx', 'apache', 'tomcat', 'iis', 'rabbitmq', 'redis', 'memcached',
+  'elasticsearch', 'logstash', 'kibana', 'grafana', 'prometheus',
+  
+  // Methodologies & Practices
+  'solid', 'clean code', 'design patterns', 'mvc', 'mvvm', 'clean architecture',
+  'domain driven design', 'ddd', 'event driven', 'cqrs', 'serverless',
+  'pair programming', 'code review', 'refactoring',
+  
+  // Soft Skills
+  'leadership', 'communication', 'problem solving', 'teamwork', 'collaboration',
+  'critical thinking', 'time management', 'adaptability', 'creativity',
+  'mentoring', 'coaching', 'presentation', 'technical writing', 'documentation'
 ];
 
 function extractEmail(text: string): string[] {
-  const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
+  // More comprehensive email pattern
+  const emailPattern = /\b[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}\b/gi;
   const matches = text.match(emailPattern);
-  const emails = matches ? [...new Set(matches)] : [];
+  const emails = matches ? [...new Set(matches)].filter(email => {
+    // Filter out common false positives
+    const invalid = ['example.com', 'test.com', 'email.com', 'domain.com'];
+    return !invalid.some(inv => email.toLowerCase().includes(inv));
+  }) : [];
   console.log('Extracted emails:', emails);
   return emails;
 }
@@ -110,64 +213,85 @@ function extractLinks(text: string): string[] {
 function extractName(text: string): string {
   console.log('Extracting name from text...');
   
-  // Clean text and split into lines
+  // Clean text - remove file paths, metadata, PDF artifacts
   const cleanText = text
-    .replace(/curriculum\s*vitae|resume|cv\b/gi, '')
+    .replace(/curriculum\s*vitae|resume|cv\s*\//gi, '')
+    .replace(/\.pdf|\.doc|\.docx/gi, '')
     .replace(/\b(page|of)\s+\d+/gi, '')
+    .replace(/\b\d{4}[-/]\d{2}[-/]\d{2}\b/g, '') // Remove dates
+    .replace(/google\s*docs|renderer|skia|pdf\s*m\d+/gi, '') // Remove PDF artifacts
     .trim();
   
   const lines = cleanText
     .split(/[\n\r]+/)
     .map(l => l.trim())
-    .filter(l => l.length > 2);
+    .filter(l => l.length > 2 && l.length < 100); // Filter reasonable line lengths
   
   console.log(`Processing ${lines.length} lines for name extraction`);
+  
+  // Common stop words to avoid
+  const stopWords = [
+    'resume', 'curriculum', 'vitae', 'profile', 'contact', 'objective',
+    'education', 'experience', 'skills', 'work history', 'employment',
+    'dear sir', 'dear madam', 'project manager', 'software engineer',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july',
+    'august', 'september', 'october', 'november', 'december',
+    'google', 'docs', 'renderer', 'new skia', 'skia', 'pdf'
+  ];
   
   // Strategy 1: Look for explicit "Name:" label
   for (const line of lines.slice(0, 20)) {
     const labelMatch = line.match(/(?:name|full\s*name|candidate)\s*:?\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z'-]+){1,3})/i);
     if (labelMatch && labelMatch[1]) {
       const name = labelMatch[1].trim();
-      console.log(`Found name with label: ${name}`);
-      return name;
+      const hasStopWord = stopWords.some(sw => name.toLowerCase().includes(sw));
+      if (!hasStopWord) {
+        console.log(`Found name with label: ${name}`);
+        return name;
+      }
     }
   }
   
-  // Strategy 2: First lines with proper name format (2-4 capitalized words)
-  for (const line of lines.slice(0, 15)) {
+  // Strategy 2: First clean lines with proper name format (2-4 capitalized words)
+  for (const line of lines.slice(0, 25)) {
     // Skip lines that are clearly not names
-    if (line.match(/^(http|www|email|phone|address|linkedin|github|\d+|@)/i)) continue;
-    if (line.length < 5 || line.length > 60) continue;
-    if (/(resume|curriculum|profile|contact|objective|education|experience|skills)/i.test(line)) continue;
+    if (line.match(/^(http|www|email|phone|address|linkedin|github|\d+|@|\.com|\.net)/i)) continue;
+    if (line.length < 5 || line.length > 50) continue;
     
-    // Match 2-4 capitalized words (typical name)
-    const nameMatch = line.match(/^([A-Z][a-zA-Z]{1,}(?:\s+[A-Z]\.?)?(?:\s+[A-Z][a-zA-Z'-]{1,}){0,2})$/);
+    // Check if line contains stop words
+    const hasStopWord = stopWords.some(sw => line.toLowerCase().includes(sw));
+    if (hasStopWord) continue;
+    
+    // Match 2-4 capitalized words (typical name format)
+    const nameMatch = line.match(/^([A-Z][a-z]+(?:\s+[A-Z]\.?)?(?:\s+[A-Z][a-z]+(?:-[A-Z][a-z]+)?){1,3})$/);
     if (nameMatch && nameMatch[1]) {
-      const words = nameMatch[1].split(/\s+/).filter(w => w.length > 1);
-      // Validate it looks like a real name (at least 2 words)
-      if (words.length >= 2 && words.length <= 4) {
+      const words = nameMatch[1].split(/\s+/).filter(w => w.length > 1 && !w.match(/^[A-Z]\.$/));
+      // Validate it looks like a real name (at least 2 words, each at least 2 chars)
+      if (words.length >= 2 && words.length <= 4 && words.every(w => w.length >= 2)) {
         console.log(`Found name in early lines: ${nameMatch[1]}`);
         return nameMatch[1].trim();
       }
     }
   }
   
-  // Strategy 3: Look for name pattern in beginning
-  const beginning = lines.slice(0, 30).join(' ');
+  // Strategy 3: Look for name pattern in text
+  const beginning = lines.slice(0, 40).join(' ');
   const namePatterns = [
     /\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,})\b/, // Three names
+    /\b([A-Z][a-z]{2,}\s+[A-Z]\.\s+[A-Z][a-z]{2,})\b/, // First M. Last
     /\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,})\b/, // Two names
   ];
   
   for (const pattern of namePatterns) {
-    const match = beginning.match(pattern);
-    if (match && match[1]) {
-      // Avoid common false positives
-      const stopWords = ['Dear Sir', 'Dear Madam', 'Project Manager', 'Software Engineer', 'January', 'February', 'March', 'April', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const isStopWord = stopWords.some(sw => match[1].includes(sw));
-      if (!isStopWord) {
-        console.log(`Found name with pattern: ${match[1]}`);
-        return match[1].trim();
+    const matches = [...beginning.matchAll(new RegExp(pattern, 'g'))];
+    for (const match of matches) {
+      if (match && match[1]) {
+        const candidate = match[1].trim();
+        const hasStopWord = stopWords.some(sw => candidate.toLowerCase().includes(sw));
+        if (!hasStopWord && candidate.length >= 5) {
+          console.log(`Found name with pattern: ${candidate}`);
+          return candidate;
+        }
       }
     }
   }
@@ -266,71 +390,99 @@ async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
     const uint8Array = new Uint8Array(arrayBuffer);
     const decoder = new TextDecoder('utf-8', { fatal: false });
-    let rawText = decoder.decode(uint8Array);
+    const rawText = decoder.decode(uint8Array);
     
     let extractedText = '';
+    const textParts: string[] = [];
     
-    // Method 1: Extract from BT/ET text blocks (most common in PDFs)
-    const textBlockPattern = /BT\s+(.*?)\s+ET/gs;
-    const textBlocks = [...rawText.matchAll(textBlockPattern)];
+    // Method 1: Extract from stream objects with comprehensive operators
+    const streamPattern = /stream\s+([\s\S]*?)\s+endstream/g;
+    const streams = [...rawText.matchAll(streamPattern)];
     
-    console.log(`Found ${textBlocks.length} text blocks`);
+    console.log(`Found ${streams.length} stream objects`);
+    
+    for (const stream of streams) {
+      const streamContent = stream[1];
+      
+      // Extract text from various PDF text operators
+      // Tj operator: (text) Tj
+      const tjMatches = streamContent.matchAll(/\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj/g);
+      for (const match of tjMatches) {
+        textParts.push(match[1]);
+      }
+      
+      // TJ operator: [(text)] TJ
+      const tjArrayMatches = streamContent.matchAll(/\[\s*\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*\]\s*TJ/g);
+      for (const match of tjArrayMatches) {
+        textParts.push(match[1]);
+      }
+      
+      // ' operator: (text) '
+      const quoteMatches = streamContent.matchAll(/\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*'/g);
+      for (const match of quoteMatches) {
+        textParts.push(match[1]);
+      }
+    }
+    
+    // Method 2: Extract from BT/ET blocks (text blocks)
+    const btPattern = /BT\s+([\s\S]*?)\s+ET/g;
+    const textBlocks = [...rawText.matchAll(btPattern)];
+    
+    console.log(`Found ${textBlocks.length} BT/ET text blocks`);
     
     for (const block of textBlocks) {
       const blockContent = block[1];
-      // Extract text within parentheses (Tj and TJ operators)
-      const textMatches = blockContent.match(/\(([^)]*)\)/g);
-      if (textMatches) {
-        for (const match of textMatches) {
-          const content = match
-            .slice(1, -1) // Remove parentheses
-            .replace(/\\n/g, '\n')
-            .replace(/\\r/g, ' ')
-            .replace(/\\t/g, ' ')
-            .replace(/\\\(/g, '(')
-            .replace(/\\\)/g, ')')
-            .replace(/\\\\/g, '\\');
-          extractedText += content + ' ';
+      
+      // Extract all text within parentheses in text blocks
+      const parenthesesMatches = blockContent.matchAll(/\(([^)\\]*(?:\\.[^)\\]*)*)\)/g);
+      for (const match of parenthesesMatches) {
+        textParts.push(match[1]);
+      }
+    }
+    
+    // Method 3: Global parentheses extraction (fallback)
+    if (textParts.length < 20) {
+      console.log('Low extraction, using global parentheses method...');
+      const globalMatches = rawText.matchAll(/\(([^)\\]{3,}(?:\\.[^)\\]*)*)\)/g);
+      for (const match of globalMatches) {
+        const text = match[1];
+        // Filter out binary/hex data
+        if (!/^[\x00-\x1F\x7F-\xFF]{5,}/.test(text)) {
+          textParts.push(text);
         }
       }
     }
     
-    // Method 2: Also try Tj and TJ operators directly
-    const tjPattern = /\(([^)]*)\)\s*Tj/g;
-    const tjMatches = [...rawText.matchAll(tjPattern)];
-    for (const match of tjMatches) {
-      const content = match[1]
+    // Process and decode extracted text parts
+    for (const part of textParts) {
+      let decoded = part
+        // Decode PDF escape sequences
         .replace(/\\n/g, '\n')
-        .replace(/\\r/g, ' ');
-      extractedText += content + ' ';
+        .replace(/\\r/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\\(/g, '(')
+        .replace(/\\\)/g, ')')
+        .replace(/\\\\/g, '\\')
+        .replace(/\\(\d{3})/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)))
+        // Clean up
+        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, ' ');
+      
+      extractedText += decoded + ' ';
     }
     
-    // Clean up extracted text
+    // Clean up final text
     let finalText = extractedText
-      .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, ' ') // Remove control chars
       .replace(/\s+/g, ' ') // Normalize whitespace
       .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space between camelCase
+      .replace(/([a-zA-Z])(\d)/g, '$1 $2') // Add space between letters and numbers
+      .replace(/(\d)([a-zA-Z])/g, '$1 $2')
       .trim();
-    
-    // Fallback if extraction yielded little text
-    if (finalText.length < 100) {
-      console.log('Primary extraction yielded little text, using fallback...');
-      const allParenthesesContent = rawText.match(/\(([^)]*)\)/g);
-      if (allParenthesesContent) {
-        finalText = allParenthesesContent
-          .map(m => m.slice(1, -1).replace(/\\n/g, '\n').replace(/\\r/g, ' '))
-          .join(' ')
-          .replace(/[\x00-\x1F]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-      }
-    }
     
     console.log(`Text extracted, length: ${finalText.length}`);
     console.log(`First 500 chars: ${finalText.substring(0, 500)}`);
     
     if (finalText.length < 50) {
-      throw new Error('Extracted text is too short');
+      throw new Error(`Extracted text is too short (${finalText.length} chars)`);
     }
     
     return finalText;
