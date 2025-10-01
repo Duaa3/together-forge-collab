@@ -109,34 +109,66 @@ function extractLinks(text: string): string[] {
 
 function extractName(text: string): string {
   console.log('Extracting name from text...');
-  const lines = text.split(/\r?\n/)
+  
+  // Clean text and split into lines
+  const cleanText = text
+    .replace(/curriculum\s*vitae|resume|cv\b/gi, '')
+    .replace(/\b(page|of)\s+\d+/gi, '')
+    .trim();
+  
+  const lines = cleanText
+    .split(/[\n\r]+/)
     .map(l => l.trim())
-    .filter(Boolean);
+    .filter(l => l.length > 2);
   
-  // Strategy 1: Look for "Name:" label
-  const nameWithLabel = text.match(/(?:name|candidate)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z'-]+){1,3})/i);
-  if (nameWithLabel && nameWithLabel[1]) {
-    console.log('Found name with label:', nameWithLabel[1]);
-    return nameWithLabel[1];
-  }
+  console.log(`Processing ${lines.length} lines for name extraction`);
   
-  // Strategy 2: First 15 lines, look for 2-4 capitalized words
-  const earlyLines = lines.slice(0, 15);
-  for (const line of earlyLines) {
-    if (/^[A-Z][a-z]+(?:\s+[A-Z]\.?)?(?:\s+[A-Z][a-z'-]+){1,2}$/i.test(line) &&
-        line.length > 4 && line.length < 60 &&
-        !/(resume|curriculum|cv|profile|contact|email|phone|address|education|experience|skills|objective)/i.test(line)) {
-      console.log('Found name in early lines:', line);
-      return line;
+  // Strategy 1: Look for explicit "Name:" label
+  for (const line of lines.slice(0, 20)) {
+    const labelMatch = line.match(/(?:name|full\s*name|candidate)\s*:?\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z'-]+){1,3})/i);
+    if (labelMatch && labelMatch[1]) {
+      const name = labelMatch[1].trim();
+      console.log(`Found name with label: ${name}`);
+      return name;
     }
   }
   
-  // Strategy 3: Look for capital letters pattern in first line
-  if (lines[0] && /[A-Z]/.test(lines[0]) && lines[0].length > 3 && lines[0].length < 60) {
-    const firstLine = lines[0];
-    if (!/^(resume|cv|curriculum)/i.test(firstLine)) {
-      console.log('Found name in first line:', firstLine);
-      return firstLine;
+  // Strategy 2: First lines with proper name format (2-4 capitalized words)
+  for (const line of lines.slice(0, 15)) {
+    // Skip lines that are clearly not names
+    if (line.match(/^(http|www|email|phone|address|linkedin|github|\d+|@)/i)) continue;
+    if (line.length < 5 || line.length > 60) continue;
+    if (/(resume|curriculum|profile|contact|objective|education|experience|skills)/i.test(line)) continue;
+    
+    // Match 2-4 capitalized words (typical name)
+    const nameMatch = line.match(/^([A-Z][a-zA-Z]{1,}(?:\s+[A-Z]\.?)?(?:\s+[A-Z][a-zA-Z'-]{1,}){0,2})$/);
+    if (nameMatch && nameMatch[1]) {
+      const words = nameMatch[1].split(/\s+/).filter(w => w.length > 1);
+      // Validate it looks like a real name (at least 2 words)
+      if (words.length >= 2 && words.length <= 4) {
+        console.log(`Found name in early lines: ${nameMatch[1]}`);
+        return nameMatch[1].trim();
+      }
+    }
+  }
+  
+  // Strategy 3: Look for name pattern in beginning
+  const beginning = lines.slice(0, 30).join(' ');
+  const namePatterns = [
+    /\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,})\b/, // Three names
+    /\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,})\b/, // Two names
+  ];
+  
+  for (const pattern of namePatterns) {
+    const match = beginning.match(pattern);
+    if (match && match[1]) {
+      // Avoid common false positives
+      const stopWords = ['Dear Sir', 'Dear Madam', 'Project Manager', 'Software Engineer', 'January', 'February', 'March', 'April', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const isStopWord = stopWords.some(sw => match[1].includes(sw));
+      if (!isStopWord) {
+        console.log(`Found name with pattern: ${match[1]}`);
+        return match[1].trim();
+      }
     }
   }
   
@@ -149,9 +181,11 @@ function extractSkills(text: string): string[] {
   const foundSkills = new Set<string>();
   const lowerText = text.toLowerCase();
   
-  // Method 1: Match against skills dictionary
+  // Method 1: Direct matching from skills dictionary with better patterns
   for (const skill of SKILLS_DICT) {
+    // Escape special regex characters
     const escaped = skill.replace(/[+.^$*|{}()[\]\\]/g, '\\$&');
+    // Use word boundaries but handle special cases like .net, c++, c#
     const regex = new RegExp(`\\b${escaped}\\b`, 'i');
     
     if (regex.test(lowerText)) {
@@ -159,40 +193,70 @@ function extractSkills(text: string): string[] {
     }
   }
   
-  // Method 2: Extract from "Skills" section
-  const skillsSectionMatch = text.match(/(?:skills|technical skills|technologies|competencies)[:\s]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i);
-  if (skillsSectionMatch) {
-    const skillsText = skillsSectionMatch[1];
-    const skillTokens = skillsText.split(/[,;|\n•·▪▫-]/);
-    skillTokens.forEach(token => {
-      const cleaned = token.trim().toLowerCase();
-      if (cleaned.length > 1 && cleaned.length < 30) {
-        if (SKILLS_DICT.some(s => s === cleaned) || 
-            /^[a-z0-9#+.-]+$/i.test(cleaned)) {
-          foundSkills.add(cleaned);
+  // Method 2: Extract from "Skills" section with better parsing
+  const skillsSectionPatterns = [
+    /(?:technical\s*)?skills\s*:?\s*(.*?)(?:\n\s*\n|education|experience|work history|projects|$)/is,
+    /(?:core\s*)?competencies\s*:?\s*(.*?)(?:\n\s*\n|education|experience|$)/is,
+    /technologies\s*:?\s*(.*?)(?:\n\s*\n|education|$)/is,
+  ];
+  
+  for (const pattern of skillsSectionPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const skillsText = match[1];
+      console.log(`Found skills section, extracting from ${skillsText.length} chars`);
+      
+      // Split by various delimiters
+      const skillTokens = skillsText.split(/[,;|\n•·▪▫\t]/);
+      
+      skillTokens.forEach(token => {
+        const cleaned = token
+          .trim()
+          .replace(/^[-•·\*\+>\d\.)]+\s*/, '') // Remove bullets
+          .replace(/\([^)]*\)/g, '') // Remove parentheses
+          .toLowerCase();
+        
+        if (cleaned.length > 1 && cleaned.length < 30) {
+          // Check against dictionary
+          for (const skill of SKILLS_DICT) {
+            if (cleaned === skill || 
+                (cleaned.includes(skill) && skill.length > 3) ||
+                (skill.includes(cleaned) && cleaned.length > 3)) {
+              foundSkills.add(skill);
+            }
+          }
         }
-      }
-    });
+      });
+    }
   }
   
-  // Method 3: Look for programming patterns
-  const techPatterns = text.match(/\b(?:proficient in|experience with|worked with|using|including)\s*:?\s*([^.]+)/gi);
-  if (techPatterns) {
-    techPatterns.forEach(pattern => {
-      const tokens = pattern.split(/[,;|&]/);
+  // Method 3: Context-based extraction (experience with, proficient in, etc.)
+  const contextPatterns = [
+    /(?:proficient in|experience with|worked with|using|including|expertise in)\s*:?\s*([^.]+)/gi,
+    /\b([\w\s+#.-]{2,20})\s*[-–]\s*(?:\d+\s*(?:years?|yrs)|proficient|expert|advanced)/gi,
+  ];
+  
+  for (const pattern of contextPatterns) {
+    const matches = [...text.matchAll(pattern)];
+    matches.forEach(match => {
+      const content = match[1].trim().toLowerCase();
+      const tokens = content.split(/[,;|&]/);
+      
       tokens.forEach(token => {
-        const cleaned = token.replace(/^(?:proficient in|experience with|worked with|using|including)\s*:?\s*/i, '').trim().toLowerCase();
+        const cleaned = token.trim();
         if (cleaned.length > 1 && cleaned.length < 30) {
-          if (SKILLS_DICT.some(s => s === cleaned)) {
-            foundSkills.add(cleaned);
+          for (const skill of SKILLS_DICT) {
+            if (cleaned === skill || cleaned.includes(skill)) {
+              foundSkills.add(skill);
+            }
           }
         }
       });
     });
   }
   
-  const skills = [...foundSkills];
-  console.log('Extracted skills:', skills);
+  const skills = [...foundSkills].sort();
+  console.log(`Extracted ${skills.length} skills:`, skills);
   return skills;
 }
 
@@ -202,37 +266,74 @@ async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
     const uint8Array = new Uint8Array(arrayBuffer);
     const decoder = new TextDecoder('utf-8', { fatal: false });
-    let text = decoder.decode(uint8Array);
+    let rawText = decoder.decode(uint8Array);
     
-    // Remove PDF control characters
-    text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, ' ');
+    let extractedText = '';
     
-    // Extract text between PDF text markers (parentheses in PDF)
-    const textMatches = text.match(/\(([^)]+)\)/g);
-    if (textMatches && textMatches.length > 10) {
-      const extractedText = textMatches
-        .map(match => match.slice(1, -1))
-        .join(' ')
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '')
-        .replace(/\\\(/g, '(')
-        .replace(/\\\)/g, ')')
-        .replace(/\\\\/g, '\\');
-      
-      console.log('Extracted text length:', extractedText.length);
-      console.log('First 200 chars:', extractedText.substring(0, 200));
-      return extractedText;
+    // Method 1: Extract from BT/ET text blocks (most common in PDFs)
+    const textBlockPattern = /BT\s+(.*?)\s+ET/gs;
+    const textBlocks = [...rawText.matchAll(textBlockPattern)];
+    
+    console.log(`Found ${textBlocks.length} text blocks`);
+    
+    for (const block of textBlocks) {
+      const blockContent = block[1];
+      // Extract text within parentheses (Tj and TJ operators)
+      const textMatches = blockContent.match(/\(([^)]*)\)/g);
+      if (textMatches) {
+        for (const match of textMatches) {
+          const content = match
+            .slice(1, -1) // Remove parentheses
+            .replace(/\\n/g, '\n')
+            .replace(/\\r/g, ' ')
+            .replace(/\\t/g, ' ')
+            .replace(/\\\(/g, '(')
+            .replace(/\\\)/g, ')')
+            .replace(/\\\\/g, '\\');
+          extractedText += content + ' ';
+        }
+      }
     }
     
-    // Fallback: clean up the raw text
-    const cleanText = text
-      .replace(/[^\x20-\x7E\n]/g, ' ')
-      .replace(/\s+/g, ' ')
+    // Method 2: Also try Tj and TJ operators directly
+    const tjPattern = /\(([^)]*)\)\s*Tj/g;
+    const tjMatches = [...rawText.matchAll(tjPattern)];
+    for (const match of tjMatches) {
+      const content = match[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, ' ');
+      extractedText += content + ' ';
+    }
+    
+    // Clean up extracted text
+    let finalText = extractedText
+      .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, ' ') // Remove control chars
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space between camelCase
       .trim();
     
-    console.log('Extracted text length (fallback):', cleanText.length);
-    console.log('First 200 chars:', cleanText.substring(0, 200));
-    return cleanText;
+    // Fallback if extraction yielded little text
+    if (finalText.length < 100) {
+      console.log('Primary extraction yielded little text, using fallback...');
+      const allParenthesesContent = rawText.match(/\(([^)]*)\)/g);
+      if (allParenthesesContent) {
+        finalText = allParenthesesContent
+          .map(m => m.slice(1, -1).replace(/\\n/g, '\n').replace(/\\r/g, ' '))
+          .join(' ')
+          .replace(/[\x00-\x1F]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+    }
+    
+    console.log(`Text extracted, length: ${finalText.length}`);
+    console.log(`First 500 chars: ${finalText.substring(0, 500)}`);
+    
+    if (finalText.length < 50) {
+      throw new Error('Extracted text is too short');
+    }
+    
+    return finalText;
   } catch (error) {
     console.error('PDF extraction error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

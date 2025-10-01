@@ -60,7 +60,7 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
         phone: data.phone || null,
         github: data.links?.find((l: string) => l.includes('github')) || null,
         linkedin: data.links?.find((l: string) => l.includes('linkedin')) || null,
-        extractedSkills: data.skills || []
+        extractedSkills: data.extractedSkills || []
       };
     } catch (error) {
       console.error(`Error parsing ${file.name}:`, error);
