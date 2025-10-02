@@ -382,6 +382,7 @@ export const TestCVUploader = () => {
     setUploading(true);
     let successCount = 0;
     let skipCount = 0;
+    const errors: string[] = [];
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -389,6 +390,11 @@ export const TestCVUploader = () => {
 
       for (const preview of validFiles) {
         try {
+          // Safety check
+          if (!preview.matchedTestCase) {
+            throw new Error('No test case selected');
+          }
+
           const filePath = `${preview.matchedTestCase}/${preview.file.name}`;
           
           // Upload to storage
@@ -402,7 +408,7 @@ export const TestCVUploader = () => {
           const { error: dbError } = await supabase
             .from('test_cv_files')
             .insert({
-              test_case_id: preview.matchedTestCase!,
+              test_case_id: preview.matchedTestCase,
               filename: preview.file.name,
               storage_path: filePath,
               uploaded_by: user.id,
@@ -412,14 +418,18 @@ export const TestCVUploader = () => {
           successCount++;
         } catch (error: any) {
           console.error(`Failed to upload ${preview.file.name}:`, error);
+          errors.push(`${preview.file.name}: ${error.message}`);
         }
       }
 
       const duplicateCount = filePreviews.filter(fp => fp.status === 'duplicate').length;
 
       toast({
-        title: "Upload complete",
-        description: `${successCount} uploaded${duplicateCount > 0 ? `, ${duplicateCount} skipped (duplicates)` : ''}`,
+        title: errors.length > 0 ? "Upload completed with errors" : "Upload complete",
+        description: errors.length > 0 
+          ? `${successCount} uploaded, ${errors.length} failed. Errors: ${errors.join('; ')}`
+          : `${successCount} uploaded${duplicateCount > 0 ? `, ${duplicateCount} skipped (duplicates)` : ''}`,
+        variant: errors.length > 0 ? "destructive" : "default",
       });
 
       setFilePreviews([]);
