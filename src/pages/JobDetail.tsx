@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe, ChevronDown, ChevronUp, Check, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe, ChevronDown, ChevronUp, Check, X, Trash2, Trash } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +58,7 @@ const JobDetail = () => {
     candidateId: string;
     candidateName: string;
   } | null>(null);
+  const [deleteJobDialog, setDeleteJobDialog] = useState(false);
   const [changingStatus, setChangingStatus] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -258,6 +259,34 @@ const JobDetail = () => {
     }
   };
 
+  const handleDeleteJob = async () => {
+    if (!jobId) return;
+
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .delete()
+        .eq("id", jobId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Job and all associated candidates deleted successfully",
+      });
+
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteJobDialog(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -300,10 +329,20 @@ const JobDetail = () => {
                   <CardTitle className="text-3xl mb-2">{job.title}</CardTitle>
                   <CardDescription className="text-base">{job.job_description}</CardDescription>
                 </div>
-                <Button onClick={() => setUploadOpen(true)}>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload CVs
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => setUploadOpen(true)}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload CVs
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => setDeleteJobDialog(true)}
+                  >
+                    <Trash className="w-4 h-4 mr-2" />
+                    Delete Job
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -592,6 +631,25 @@ const JobDetail = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={deleteCandidate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteJobDialog} onOpenChange={setDeleteJobDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{job?.title}</strong>?
+              This will permanently delete the job and all {candidates.length} associated candidate{candidates.length !== 1 ? 's' : ''}.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteJob} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Job
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

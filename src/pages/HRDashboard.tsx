@@ -4,7 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, LogOut, Plus, BarChart3 } from "lucide-react";
+import { Briefcase, LogOut, Plus, BarChart3, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import CreateJobDialog from "@/components/CreateJobDialog";
 
 interface Job {
@@ -18,6 +28,11 @@ const HRDashboard = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [createJobOpen, setCreateJobOpen] = useState(false);
   const [userId, setUserId] = useState<string>("");
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    jobId: string;
+    jobTitle: string;
+  } | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -54,6 +69,34 @@ const HRDashboard = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/auth");
+  };
+
+  const handleDeleteJob = async () => {
+    if (!deleteDialog) return;
+
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .delete()
+        .eq("id", deleteDialog.jobId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Job and all associated candidates deleted successfully",
+      });
+
+      fetchJobs();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialog(null);
+    }
   };
 
   return (
@@ -104,11 +147,26 @@ const HRDashboard = () => {
             {jobs.map((job) => (
               <Card 
                 key={job.id} 
-                className="hover:shadow-lg transition-shadow cursor-pointer"
+                className="hover:shadow-lg transition-shadow cursor-pointer relative"
                 onClick={() => navigate(`/jobs/${job.id}`)}
               >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteDialog({
+                      open: true,
+                      jobId: job.id,
+                      jobTitle: job.title,
+                    });
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 pr-8">
                     <Briefcase className="w-5 h-5 text-primary" />
                     {job.title}
                   </CardTitle>
@@ -139,6 +197,25 @@ const HRDashboard = () => {
         onJobCreated={fetchJobs}
         userId={userId}
       />
+
+      <AlertDialog open={deleteDialog?.open || false} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteDialog?.jobTitle}</strong>?
+              This will permanently delete the job and all associated candidates.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteJob} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Job
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
