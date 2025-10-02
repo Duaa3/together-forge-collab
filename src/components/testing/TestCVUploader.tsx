@@ -382,13 +382,26 @@ export const TestCVUploader = () => {
     setUploading(true);
     let successCount = 0;
     let skipCount = 0;
-    const errors: string[] = [];
+    const errors: Array<{ file: string; error: string; step: string }> = [];
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Pre-upload validation and logging
+      console.group('📤 Batch Upload Started');
+      console.log('Total files to upload:', validFiles.length);
+      console.table(validFiles.map(f => ({
+        filename: f.file.name,
+        testCase: f.matchedTestCase,
+        confidence: f.confidence
+      })));
+      console.groupEnd();
+
       for (const preview of validFiles) {
+        const filename = preview.file.name;
+        console.log(`\n🔄 Processing: ${filename}`);
+        
         try {
           // Safety check
           if (!preview.matchedTestCase) {
@@ -396,15 +409,22 @@ export const TestCVUploader = () => {
           }
 
           const filePath = `${preview.matchedTestCase}/${preview.file.name}`;
+          console.log(`  ├─ Storage path: ${filePath}`);
           
           // Upload to storage
+          console.log(`  ├─ Uploading to storage...`);
           const { error: uploadError } = await supabase.storage
             .from('test-cvs')
             .upload(filePath, preview.file, { upsert: true });
 
-          if (uploadError) throw uploadError;
+          if (uploadError) {
+            console.error(`  ├─ ❌ Storage upload failed:`, uploadError);
+            throw new Error(`Storage: ${uploadError.message || JSON.stringify(uploadError)}`);
+          }
+          console.log(`  ├─ ✅ Storage upload successful`);
 
           // Save metadata to database
+          console.log(`  ├─ Saving to database...`);
           const { error: dbError } = await supabase
             .from('test_cv_files')
             .insert({
@@ -414,20 +434,43 @@ export const TestCVUploader = () => {
               uploaded_by: user.id,
             });
 
-          if (dbError) throw dbError;
+          if (dbError) {
+            console.error(`  ├─ ❌ Database insert failed:`, dbError);
+            throw new Error(`Database: ${dbError.message || dbError.code || JSON.stringify(dbError)}`);
+          }
+          
+          console.log(`  └─ ✅ Complete`);
           successCount++;
         } catch (error: any) {
-          console.error(`Failed to upload ${preview.file.name}:`, error);
-          errors.push(`${preview.file.name}: ${error.message}`);
+          const errorMsg = error?.message || error?.error_description || String(error);
+          console.error(`  └─ ❌ FAILED: ${errorMsg}`);
+          console.error('  Full error object:', error);
+          
+          errors.push({
+            file: filename,
+            error: errorMsg,
+            step: error.message?.includes('Storage') ? 'storage' : 
+                  error.message?.includes('Database') ? 'database' : 'unknown'
+          });
         }
       }
 
       const duplicateCount = filePreviews.filter(fp => fp.status === 'duplicate').length;
 
+      // Display detailed results
+      console.group('📊 Upload Results');
+      console.log('✅ Successful:', successCount);
+      console.log('❌ Failed:', errors.length);
+      console.log('⏭️ Duplicates skipped:', duplicateCount);
+      if (errors.length > 0) {
+        console.table(errors);
+      }
+      console.groupEnd();
+
       toast({
         title: errors.length > 0 ? "Upload completed with errors" : "Upload complete",
         description: errors.length > 0 
-          ? `${successCount} uploaded, ${errors.length} failed. Errors: ${errors.join('; ')}`
+          ? `${successCount} uploaded, ${errors.length} failed. Check console for details.`
           : `${successCount} uploaded${duplicateCount > 0 ? `, ${duplicateCount} skipped (duplicates)` : ''}`,
         variant: errors.length > 0 ? "destructive" : "default",
       });
