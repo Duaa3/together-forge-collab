@@ -11,6 +11,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import testCases from "../../../tests/test-cases/extraction-test-cases.json";
+import { PdfProcessor } from "@/lib/pdf/PdfProcessor";
+import { CandidateExtractor } from "@/lib/extraction/CandidateExtractor";
 
 interface UploadedFile {
   id: string;
@@ -154,15 +156,24 @@ export const TestCVUploader = () => {
   };
 
   const parseCVContent = async (file: File): Promise<ParsedCV> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const { data, error } = await supabase.functions.invoke('parse-cv', {
-      body: formData
-    });
-    
-    if (error) throw error;
-    return data as ParsedCV;
+    try {
+      // Use client-side PDF processor (same as UploadCVDialog)
+      const processor = new PdfProcessor();
+      const text = await processor.extractText(file);
+      
+      // Use client-side candidate extractor
+      const extracted = CandidateExtractor.extract(text, file.name);
+      
+      return {
+        name: extracted.name || 'Unknown Candidate',
+        email: extracted.email || '',
+        phone: extracted.phone || '',
+        extractedSkills: extracted.skills || []
+      };
+    } catch (error) {
+      console.error('PDF parsing error:', error);
+      throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const findBestMatch = (parsedCV: ParsedCV): MatchScore[] => {
