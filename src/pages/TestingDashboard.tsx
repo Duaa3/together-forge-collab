@@ -1,7 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CVTestRunner } from "@/components/testing/CVTestRunner";
-import { FileUp, BarChart3, CheckSquare } from "lucide-react";
+import { TestCVUploader } from "@/components/testing/TestCVUploader";
+import { BarChart3, CheckSquare } from "lucide-react";
 
 const TestingDashboard = () => {
   return (
@@ -19,24 +20,8 @@ const TestingDashboard = () => {
         </TabsList>
 
         <TabsContent value="extraction" className="space-y-4">
+          <TestCVUploader />
           <CVTestRunner />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileUp className="h-5 w-5" />
-                Upload Test CVs
-              </CardTitle>
-              <CardDescription>
-                Add CVs to test extraction accuracy
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Target: 50+ diverse CV formats for comprehensive testing
-              </p>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="scoring">

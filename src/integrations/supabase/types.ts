@@ -354,6 +354,69 @@ export type Database = {
         }
         Relationships: []
       }
+      test_cv_files: {
+        Row: {
+          filename: string
+          id: string
+          storage_path: string
+          test_case_id: string
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          filename: string
+          id?: string
+          storage_path: string
+          test_case_id: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          filename?: string
+          id?: string
+          storage_path?: string
+          test_case_id?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      test_results: {
+        Row: {
+          actual_data: Json
+          expected_data: Json
+          field_results: Json
+          id: string
+          passed: boolean
+          run_at: string | null
+          run_by: string | null
+          test_case_id: string
+          test_run_id: string
+        }
+        Insert: {
+          actual_data: Json
+          expected_data: Json
+          field_results: Json
+          id?: string
+          passed: boolean
+          run_at?: string | null
+          run_by?: string | null
+          test_case_id: string
+          test_run_id: string
+        }
+        Update: {
+          actual_data?: Json
+          expected_data?: Json
+          field_results?: Json
+          id?: string
+          passed?: boolean
+          run_at?: string | null
+          run_by?: string | null
+          test_case_id?: string
+          test_run_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
