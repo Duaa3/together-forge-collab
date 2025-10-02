@@ -325,40 +325,6 @@ export default function HRAnalyticsDashboard() {
               </PieChart>
             </ResponsiveContainer>
           </Card>
-
-          {/* Average AI Scores */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Average AI Scoring Dimensions</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={scoreData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dimension" />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
-                <Bar dataKey="score" fill="#82ca9d" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          {/* Market Trends */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Market Intelligence - High Demand Skills</h3>
-            <div className="space-y-3">
-              {analytics.marketTrends.slice(0, 8).map((trend: any) => (
-                <div key={trend.skill_name} className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{trend.skill_name}</span>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={trend.trend_direction === 'rising' ? 'default' : 'secondary'}>
-                      {trend.trend_direction}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">
-                      Demand: {trend.demand_score}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
         </div>
       </div>
     </div>
