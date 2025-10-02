@@ -47,8 +47,8 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
       const text = await processor.extractText(file);
       console.log(`Extracted ${text.length} characters from ${file.name}`);
 
-      // Extract candidate information from text
-      const candidateData = CandidateExtractor.extract(text);
+      // Extract candidate information from text (pass filename for better name extraction)
+      const candidateData = CandidateExtractor.extract(text, file.name);
       console.log(`Successfully extracted data from ${file.name}:`, candidateData);
       
       return {

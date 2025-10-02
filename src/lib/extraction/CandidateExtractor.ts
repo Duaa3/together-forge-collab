@@ -144,17 +144,112 @@ export class CandidateExtractor {
   };
 
   /**
+   * Extract name from filename with smart cleaning
+   */
+  private static extractNameFromFilename(filename: string): string | null {
+    try {
+      // Remove file extension
+      let name = filename.replace(/\.(pdf|doc|docx|txt)$/i, '');
+      
+      // Remove common CV keywords (case insensitive)
+      const cvKeywords = [
+        'cv', 'resume', 'curriculum', 'vitae', 'curriculum vitae',
+        'resume cv', 'cv resume', 'cv_', '_cv', '-cv', 'cv-',
+        'my cv', 'mycv', 'my resume', 'myresume'
+      ];
+      
+      cvKeywords.forEach(keyword => {
+        const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        name = name.replace(regex, '');
+      });
+      
+      // Remove dates and years (2020-2025, etc.)
+      name = name.replace(/\b(19|20)\d{2}\b/g, '');
+      name = name.replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{1,2}(st|nd|rd|th)?\s*,?\s*(19|20)?\d{2}\b/gi, '');
+      
+      // Remove common suffixes like "updated", "final", "latest"
+      const suffixes = ['updated', 'final', 'latest', 'new', 'old', 'draft', 'version', 'v1', 'v2', 'v3'];
+      suffixes.forEach(suffix => {
+        const regex = new RegExp(`\\b${suffix}\\b`, 'gi');
+        name = name.replace(regex, '');
+      });
+      
+      // Replace separators (underscore, hyphen, dot) with spaces
+      name = name.replace(/[_\-\.]+/g, ' ');
+      
+      // Remove extra whitespace
+      name = name.trim().replace(/\s+/g, ' ');
+      
+      // Validate: should have 1-5 words, each word 2+ characters
+      const words = name.split(/\s+/).filter(word => word.length >= 2);
+      if (words.length === 0 || words.length > 5) {
+        return null;
+      }
+      
+      // Apply proper capitalization
+      const capitalizedWords = words.map(word => {
+        // Handle all caps or all lowercase
+        if (word === word.toUpperCase() || word === word.toLowerCase()) {
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }
+        return word;
+      });
+      
+      const finalName = capitalizedWords.join(' ');
+      
+      // Final validation: should look like a name (letters only, possibly with spaces)
+      if (!/^[a-zA-Z\s]{3,50}$/.test(finalName)) {
+        return null;
+      }
+      
+      return finalName;
+    } catch (error) {
+      console.error('Error extracting name from filename:', error);
+      return null;
+    }
+  }
+
+  /**
    * Extract candidate information from CV text
    */
-  static extract(text: string): ExtractedCandidate {
-    const cleanText = this.cleanText(text);
+  static extract(text: string, filename?: string): ExtractedCandidate {
+    const cleanedText = this.cleanText(text);
+    
+    // Try filename extraction first (highest priority)
+    let extractedName = 'Unknown';
+    if (filename) {
+      const nameFromFile = this.extractNameFromFilename(filename);
+      if (nameFromFile) {
+        extractedName = nameFromFile;
+      }
+    }
+    
+    // If filename extraction failed, try text-based extraction
+    if (extractedName === 'Unknown') {
+      extractedName = this.extractName(cleanedText);
+    }
+    
+    // Final fallback: try email username if available
+    if (extractedName === 'Unknown') {
+      const email = this.extractEmail(cleanedText);
+      if (email) {
+        const username = email.split('@')[0];
+        const nameFromEmail = username.replace(/[._\-]/g, ' ')
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+        if (nameFromEmail.length >= 3) {
+          extractedName = nameFromEmail;
+        }
+      }
+    }
     
     return {
-      name: this.extractName(cleanText),
-      email: this.extractEmail(cleanText),
-      phone: this.extractPhone(cleanText),
-      skills: this.extractSkills(cleanText),
-      links: this.extractLinks(cleanText),
+      name: extractedName,
+      email: this.extractEmail(cleanedText),
+      phone: this.extractPhone(cleanedText),
+      skills: this.extractSkills(cleanedText),
+      links: this.extractLinks(cleanedText),
     };
   }
 
