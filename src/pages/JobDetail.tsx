@@ -122,14 +122,14 @@ const JobDetail = () => {
   };
 
   const getDecisionBadge = (decision: string | null, score: number | null) => {
-    if (decision === "accept") {
+    if (decision === "accepted") {
       return (
         <Badge className="bg-success text-success-foreground">
           <CheckCircle className="w-3 h-3 mr-1" />
           Accepted
         </Badge>
       );
-    } else if (decision === "reject") {
+    } else if (decision === "rejected") {
       return (
         <Badge className="bg-destructive text-destructive-foreground">
           <XCircle className="w-3 h-3 mr-1" />
