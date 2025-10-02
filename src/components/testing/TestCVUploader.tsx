@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, X, FileText, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { Upload, X, FileText, CheckCircle2, AlertCircle, Info, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import testCases from "../../../tests/test-cases/extraction-test-cases.json";
 
 interface UploadedFile {
@@ -19,17 +20,102 @@ interface UploadedFile {
   uploaded_at: string;
 }
 
-interface FilePreview {
-  file: File;
-  detectedTestCase: string | null;
-  status: 'valid' | 'invalid' | 'duplicate';
-  message?: string;
+interface ParsedCV {
+  name: string;
+  email: string;
+  phone: string;
+  extractedSkills: string[];
 }
 
-const detectTestCaseFromFilename = (filename: string): string | null => {
-  const pattern = /TC(\d{3})/i;
-  const match = filename.match(pattern);
-  return match ? `TC${match[1]}` : null;
+interface MatchScore {
+  testCaseId: string;
+  confidence: number;
+  matchDetails: {
+    nameMatch: boolean;
+    emailMatch: boolean;
+    phoneMatch: boolean;
+    skillsOverlap: number;
+  };
+}
+
+interface FilePreview {
+  file: File;
+  status: 'analyzing' | 'auto-matched' | 'suggested' | 'manual' | 'duplicate' | 'error';
+  matchedTestCase?: string;
+  confidence?: number;
+  matchDetails?: MatchScore['matchDetails'];
+  parsedCV?: ParsedCV;
+  allMatches?: MatchScore[];
+  errorMessage?: string;
+}
+
+// Helper functions for matching
+const normalizeString = (str: string): string => {
+  return str.toLowerCase().trim().replace(/\s+/g, ' ');
+};
+
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const matrix: number[][] = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+};
+
+const calculateNameSimilarity = (name1: string, name2: string): number => {
+  const n1 = normalizeString(name1);
+  const n2 = normalizeString(name2);
+  
+  if (n1 === n2) return 40;
+  if (n1.includes(n2) || n2.includes(n1)) return 20;
+  
+  const distance = levenshteinDistance(n1, n2);
+  const maxLen = Math.max(n1.length, n2.length);
+  const similarity = 1 - (distance / maxLen);
+  
+  return similarity > 0.8 ? 20 : 0;
+};
+
+const normalizePhone = (phone: string): string => {
+  return phone.replace(/[\s\-\(\)\+]/g, '');
+};
+
+const calculateSkillsOverlap = (
+  extractedSkills: string[], 
+  expectedSkills: string[]
+): number => {
+  if (expectedSkills.length === 0) return 0;
+  
+  const normalizedExtracted = extractedSkills.map(s => normalizeString(s));
+  const normalizedExpected = expectedSkills.map(s => normalizeString(s));
+  
+  const matches = normalizedExpected.filter(skill =>
+    normalizedExtracted.some(extracted => 
+      extracted.includes(skill) || skill.includes(extracted)
+    )
+  );
+  
+  return (matches.length / normalizedExpected.length) * 100;
 };
 
 export const TestCVUploader = () => {
@@ -67,57 +153,188 @@ export const TestCVUploader = () => {
     }
   };
 
+  const parseCVContent = async (file: File): Promise<ParsedCV> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const { data, error } = await supabase.functions.invoke('parse-cv', {
+      body: formData
+    });
+    
+    if (error) throw error;
+    return data as ParsedCV;
+  };
+
+  const findBestMatch = (parsedCV: ParsedCV): MatchScore[] => {
+    const scores: MatchScore[] = [];
+    
+    for (const testCase of testCases.testCases) {
+      let confidence = 0;
+      
+      // Name matching (40 points)
+      const nameScore = calculateNameSimilarity(
+        parsedCV.name || '',
+        testCase.expectedData.name
+      );
+      confidence += nameScore;
+      
+      // Email matching (20 points)
+      let emailMatch = false;
+      if (parsedCV.email && testCase.expectedData.email) {
+        emailMatch = normalizeString(parsedCV.email) === 
+                     normalizeString(testCase.expectedData.email);
+        confidence += emailMatch ? 20 : 0;
+      }
+      
+      // Phone matching (15 points)
+      let phoneMatch = false;
+      if (parsedCV.phone && testCase.expectedData.phone) {
+        const phone1 = normalizePhone(parsedCV.phone);
+        const phone2 = normalizePhone(testCase.expectedData.phone);
+        
+        if (phone1 === phone2) {
+          confidence += 15;
+          phoneMatch = true;
+        } else if (phone1.slice(-7) === phone2.slice(-7)) {
+          confidence += 10;
+          phoneMatch = true;
+        }
+      }
+      
+      // Skills overlap (25 points)
+      const skillsScore = calculateSkillsOverlap(
+        parsedCV.extractedSkills || [],
+        testCase.expectedData.skills
+      );
+      confidence += (skillsScore / 100) * 25;
+      
+      scores.push({
+        testCaseId: testCase.id,
+        confidence: Math.round(confidence),
+        matchDetails: {
+          nameMatch: nameScore > 0,
+          emailMatch,
+          phoneMatch,
+          skillsOverlap: Math.round(skillsScore)
+        }
+      });
+    }
+    
+    return scores.sort((a, b) => b.confidence - a.confidence);
+  };
+
   const handleFilesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const previews: FilePreview[] = [];
+    const initialPreviews: FilePreview[] = [];
     
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
       if (file.type !== 'application/pdf') {
-        previews.push({
+        initialPreviews.push({
           file,
-          detectedTestCase: null,
-          status: 'invalid',
-          message: 'Not a PDF file'
+          status: 'error',
+          errorMessage: 'Not a PDF file'
         });
         continue;
       }
 
-      const detectedTestCase = detectTestCaseFromFilename(file.name);
-      
-      if (!detectedTestCase) {
-        previews.push({
-          file,
-          detectedTestCase: null,
-          status: 'invalid',
-          message: 'No test case ID found in filename'
-        });
-        continue;
-      }
-
-      const testCaseExists = testCases.testCases.some(tc => tc.id === detectedTestCase);
-      if (!testCaseExists) {
-        previews.push({
-          file,
-          detectedTestCase,
-          status: 'invalid',
-          message: `Test case ${detectedTestCase} not found`
-        });
-        continue;
-      }
-
-      const isDuplicate = uploadedFiles.some(uf => uf.test_case_id === detectedTestCase);
-      previews.push({
+      initialPreviews.push({
         file,
-        detectedTestCase,
-        status: isDuplicate ? 'duplicate' : 'valid',
-        message: isDuplicate ? 'Test case already uploaded' : undefined
+        status: 'analyzing'
       });
     }
 
-    setFilePreviews(previews);
+    setFilePreviews(initialPreviews);
+
+    // Process files in parallel
+    const processedPreviews = await Promise.all(
+      initialPreviews.map(async (preview) => {
+        if (preview.status === 'error') return preview;
+
+        try {
+          // Parse CV content
+          const parsedCV = await parseCVContent(preview.file);
+          
+          // Find best matches
+          const matches = findBestMatch(parsedCV);
+          const bestMatch = matches[0];
+
+          // Check for duplicates
+          const isDuplicate = uploadedFiles.some(
+            uf => uf.test_case_id === bestMatch.testCaseId
+          );
+
+          if (isDuplicate) {
+            return {
+              ...preview,
+              status: 'duplicate' as const,
+              matchedTestCase: bestMatch.testCaseId,
+              confidence: bestMatch.confidence,
+              parsedCV,
+              allMatches: matches,
+              matchDetails: bestMatch.matchDetails
+            };
+          }
+
+          // Determine status based on confidence
+          if (bestMatch.confidence >= 90) {
+            return {
+              ...preview,
+              status: 'auto-matched' as const,
+              matchedTestCase: bestMatch.testCaseId,
+              confidence: bestMatch.confidence,
+              parsedCV,
+              allMatches: matches,
+              matchDetails: bestMatch.matchDetails
+            };
+          } else if (bestMatch.confidence >= 70) {
+            return {
+              ...preview,
+              status: 'suggested' as const,
+              matchedTestCase: bestMatch.testCaseId,
+              confidence: bestMatch.confidence,
+              parsedCV,
+              allMatches: matches,
+              matchDetails: bestMatch.matchDetails
+            };
+          } else {
+            return {
+              ...preview,
+              status: 'manual' as const,
+              confidence: bestMatch.confidence,
+              parsedCV,
+              allMatches: matches
+            };
+          }
+        } catch (error: any) {
+          console.error(`Failed to parse ${preview.file.name}:`, error);
+          return {
+            ...preview,
+            status: 'error' as const,
+            errorMessage: error.message || 'Failed to parse CV'
+          };
+        }
+      })
+    );
+
+    setFilePreviews(processedPreviews);
+  };
+
+  const handleTestCaseChange = (index: number, testCaseId: string) => {
+    setFilePreviews(prev => {
+      const updated = [...prev];
+      const isDuplicate = uploadedFiles.some(uf => uf.test_case_id === testCaseId);
+      
+      updated[index] = {
+        ...updated[index],
+        matchedTestCase: testCaseId,
+        status: isDuplicate ? 'duplicate' as const : updated[index].status
+      };
+      
+      return updated;
+    });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -137,12 +354,15 @@ export const TestCVUploader = () => {
   };
 
   const handleBatchUpload = async () => {
-    const validFiles = filePreviews.filter(fp => fp.status === 'valid' || fp.status === 'duplicate');
+    const validFiles = filePreviews.filter(
+      fp => fp.matchedTestCase && 
+            (fp.status === 'auto-matched' || fp.status === 'suggested' || fp.status === 'manual')
+    );
     
     if (validFiles.length === 0) {
       toast({
         title: "No valid files",
-        description: "Please add files with valid test case IDs in the filename",
+        description: "Please ensure all files have matched test cases",
         variant: "destructive",
       });
       return;
@@ -158,14 +378,8 @@ export const TestCVUploader = () => {
 
       for (const preview of validFiles) {
         try {
-          const filePath = `${preview.detectedTestCase}/${preview.file.name}`;
+          const filePath = `${preview.matchedTestCase}/${preview.file.name}`;
           
-          // Check if duplicate and skip
-          if (preview.status === 'duplicate') {
-            skipCount++;
-            continue;
-          }
-
           // Upload to storage
           const { error: uploadError } = await supabase.storage
             .from('test-cvs')
@@ -177,7 +391,7 @@ export const TestCVUploader = () => {
           const { error: dbError } = await supabase
             .from('test_cv_files')
             .insert({
-              test_case_id: preview.detectedTestCase!,
+              test_case_id: preview.matchedTestCase!,
               filename: preview.file.name,
               storage_path: filePath,
               uploaded_by: user.id,
@@ -190,9 +404,11 @@ export const TestCVUploader = () => {
         }
       }
 
+      const duplicateCount = filePreviews.filter(fp => fp.status === 'duplicate').length;
+
       toast({
         title: "Upload complete",
-        description: `${successCount} uploaded, ${skipCount} skipped (duplicates)`,
+        description: `${successCount} uploaded${duplicateCount > 0 ? `, ${duplicateCount} skipped (duplicates)` : ''}`,
       });
 
       setFilePreviews([]);
@@ -272,11 +488,11 @@ export const TestCVUploader = () => {
           <Progress value={coveragePercentage} className="h-2" />
         </div>
 
-        {/* Naming Convention Info */}
+        {/* Auto-Detection Info */}
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <strong>Filename convention:</strong> Include test case ID in your filename (e.g., TC001_john_doe.pdf, standard_cv_tc002.pdf)
+            <strong>Smart Upload:</strong> Upload any CV with any filename - the system automatically matches it to test cases by analyzing content
           </AlertDescription>
         </Alert>
 
@@ -359,9 +575,15 @@ export const TestCVUploader = () => {
                 <Button
                   size="sm"
                   onClick={handleBatchUpload}
-                  disabled={uploading || !filePreviews.some(fp => fp.status === 'valid')}
+                  disabled={uploading || !filePreviews.some(fp => 
+                    (fp.status === 'auto-matched' || fp.status === 'suggested' || fp.status === 'manual') && 
+                    fp.matchedTestCase
+                  )}
                 >
-                  {uploading ? "Uploading..." : `Upload ${filePreviews.filter(fp => fp.status === 'valid').length} Files`}
+                  {uploading ? "Uploading..." : `Upload ${filePreviews.filter(fp => 
+                    (fp.status === 'auto-matched' || fp.status === 'suggested' || fp.status === 'manual') && 
+                    fp.matchedTestCase
+                  ).length} Files`}
                 </Button>
               </div>
             </div>
@@ -371,46 +593,149 @@ export const TestCVUploader = () => {
                   <TableRow>
                     <TableHead>Status</TableHead>
                     <TableHead>Filename</TableHead>
+                    <TableHead>Match Details</TableHead>
                     <TableHead>Test Case</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filePreviews.map((preview, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        {preview.status === 'valid' && (
-                          <Badge variant="default" className="bg-green-500">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Ready
-                          </Badge>
-                        )}
-                        {preview.status === 'duplicate' && (
-                          <Badge variant="secondary">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            Duplicate
-                          </Badge>
-                        )}
-                        {preview.status === 'invalid' && (
-                          <Badge variant="destructive">
-                            <X className="h-3 w-3 mr-1" />
-                            Invalid
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {preview.file.name}
-                      </TableCell>
-                      <TableCell>
-                        {preview.detectedTestCase ? (
-                          <span className="font-medium">{preview.detectedTestCase}</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            {preview.message}
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filePreviews.map((preview, index) => {
+                    const getTestCaseName = (id: string) => {
+                      const tc = testCases.testCases.find(t => t.id === id);
+                      return tc ? `${tc.id} - ${tc.expectedData.name}` : id;
+                    };
+
+                    return (
+                      <TableRow key={index}>
+                        <TableCell>
+                          {preview.status === 'analyzing' && (
+                            <Badge variant="secondary">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Analyzing
+                            </Badge>
+                          )}
+                          {preview.status === 'auto-matched' && (
+                            <Badge variant="default" className="bg-green-500">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Auto-matched
+                            </Badge>
+                          )}
+                          {preview.status === 'suggested' && (
+                            <Badge variant="default" className="bg-amber-500">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Suggested
+                            </Badge>
+                          )}
+                          {preview.status === 'manual' && (
+                            <Badge variant="secondary">
+                              <Info className="h-3 w-3 mr-1" />
+                              Manual
+                            </Badge>
+                          )}
+                          {preview.status === 'duplicate' && (
+                            <Badge variant="secondary">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Duplicate
+                            </Badge>
+                          )}
+                          {preview.status === 'error' && (
+                            <Badge variant="destructive">
+                              <X className="h-3 w-3 mr-1" />
+                              Error
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs max-w-[200px] truncate">
+                          {preview.file.name}
+                        </TableCell>
+                        <TableCell>
+                          {preview.status === 'analyzing' && (
+                            <span className="text-xs text-muted-foreground">
+                              Parsing CV content...
+                            </span>
+                          )}
+                          {preview.status === 'error' && (
+                            <span className="text-xs text-destructive">
+                              {preview.errorMessage}
+                            </span>
+                          )}
+                          {(preview.status === 'auto-matched' || preview.status === 'suggested' || preview.status === 'duplicate') && preview.matchDetails && (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium">
+                                  {preview.confidence}% confidence
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground space-y-0.5">
+                                <div className="flex items-center gap-1">
+                                  {preview.matchDetails.nameMatch ? (
+                                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                  ) : (
+                                    <X className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                  <span>Name: {preview.parsedCV?.name || 'N/A'}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {preview.matchDetails.emailMatch ? (
+                                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                  ) : (
+                                    <X className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                  <span>Email: {preview.parsedCV?.email || 'N/A'}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {preview.matchDetails.phoneMatch ? (
+                                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                  ) : (
+                                    <X className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                  <span>Phone: {preview.parsedCV?.phone || 'N/A'}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span>Skills: {preview.matchDetails.skillsOverlap}% match ({preview.parsedCV?.extractedSkills?.length || 0} found)</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {preview.status === 'manual' && (
+                            <div className="text-xs text-muted-foreground">
+                              <div>Best match: {preview.confidence}% confidence</div>
+                              <div className="mt-1">Please select manually below</div>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {preview.status === 'analyzing' && (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                          {preview.status === 'error' && (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                          {(preview.status === 'auto-matched' || preview.status === 'duplicate') && (
+                            <span className="font-medium text-sm">
+                              {getTestCaseName(preview.matchedTestCase!)}
+                            </span>
+                          )}
+                          {(preview.status === 'suggested' || preview.status === 'manual') && (
+                            <Select
+                              value={preview.matchedTestCase || ''}
+                              onValueChange={(value) => handleTestCaseChange(index, value)}
+                            >
+                              <SelectTrigger className="w-[250px]">
+                                <SelectValue placeholder="Select test case..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {preview.allMatches?.slice(0, 5).map((match) => (
+                                  <SelectItem key={match.testCaseId} value={match.testCaseId}>
+                                    {getTestCaseName(match.testCaseId)} ({match.confidence}%)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
