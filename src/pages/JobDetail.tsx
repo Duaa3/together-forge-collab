@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe, ChevronDown, ChevronUp, Check, X } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe, ChevronDown, ChevronUp, Check, X, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +52,11 @@ const JobDetail = () => {
     candidateId: string;
     candidateName: string;
     decision: "accept" | "reject";
+  } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    candidateId: string;
+    candidateName: string;
   } | null>(null);
 
   useEffect(() => {
@@ -206,6 +211,45 @@ const JobDetail = () => {
     }
   };
 
+  const handleDeleteClick = (candidateId: string, candidateName: string) => {
+    setDeleteDialog({
+      open: true,
+      candidateId,
+      candidateName,
+    });
+  };
+
+  const deleteCandidate = async () => {
+    if (!deleteDialog) return;
+
+    const { candidateId } = deleteDialog;
+
+    try {
+      const { error } = await supabase
+        .from("candidates")
+        .delete()
+        .eq("id", candidateId);
+
+      if (error) throw error;
+
+      // Remove from state
+      setCandidates(prev => prev.filter(c => c.id !== candidateId));
+
+      toast({
+        title: "Success",
+        description: "Candidate deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialog(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -341,30 +385,37 @@ const JobDetail = () => {
                         <div className="flex items-center gap-2">
                           {getDecisionBadge(candidate.decision, candidate.match_score)}
                           
-                          {(!candidate.decision || candidate.decision === "pending") && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 gap-1 border-success text-success hover:bg-success hover:text-success-foreground"
-                                onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "accept")}
-                                disabled={updatingDecision === candidate.id}
-                              >
-                                <Check className="w-3 h-3" />
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "reject")}
-                                disabled={updatingDecision === candidate.id}
-                              >
-                                <X className="w-3 h-3" />
-                                Reject
-                              </Button>
-                            </div>
-                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1 border-success text-success hover:bg-success hover:text-success-foreground"
+                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "accept")}
+                              disabled={updatingDecision === candidate.id}
+                            >
+                              <Check className="w-3 h-3" />
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "reject")}
+                              disabled={updatingDecision === candidate.id}
+                            >
+                              <X className="w-3 h-3" />
+                              Reject
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                              onClick={() => handleDeleteClick(candidate.id, candidate.name || "Unknown")}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </Button>
+                          </div>
                         </div>
                         
                         <div className="flex flex-col items-end">
@@ -500,6 +551,24 @@ const JobDetail = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={updateCandidateDecision}>
               Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteDialog?.open || false} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Candidate?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteDialog?.candidateName}</strong>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteCandidate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
