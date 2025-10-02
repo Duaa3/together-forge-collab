@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, TrendingUp, Users, Target, BarChart3, RefreshCw } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, Target, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,9 +14,6 @@ export default function HRAnalyticsDashboard() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<any>(null);
-  const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [processStatus, setProcessStatus] = useState('');
 
   useEffect(() => {
     fetchAnalytics();
@@ -67,76 +64,6 @@ export default function HRAnalyticsDashboard() {
     }
   };
 
-  const processCandidates = async () => {
-    try {
-      setProcessing(true);
-      setProgress(0);
-      setProcessStatus('Starting batch processing...');
-
-      // Get total candidate count
-      const { count } = await supabase
-        .from('candidates')
-        .select('*', { count: 'exact', head: true });
-
-      const totalCandidates = count || 0;
-      const batchSize = 5;
-      let offset = 0;
-      let totalProcessed = 0;
-
-      while (true) {
-        setProcessStatus(`Processing candidates ${offset + 1} to ${Math.min(offset + batchSize, totalCandidates)}...`);
-
-        const { data, error } = await supabase.functions.invoke('batch-process-candidates', {
-          body: { batchSize, offset }
-        });
-
-        if (error) {
-          console.error('Batch processing error:', error);
-          toast({
-            title: 'Processing Error',
-            description: error.message || 'Failed to process candidates',
-            variant: 'destructive',
-          });
-          break;
-        }
-
-        totalProcessed += data.processed;
-        const progressPercent = Math.min((totalProcessed / totalCandidates) * 100, 100);
-        setProgress(progressPercent);
-
-        if (data.errors && data.errors.length > 0) {
-          console.warn('Processing errors:', data.errors);
-        }
-
-        if (data.completed) {
-          setProcessStatus(`Completed! Processed ${totalProcessed} candidates.`);
-          toast({
-            title: 'Processing Complete',
-            description: `Successfully processed ${totalProcessed} candidates with AI analysis.`,
-          });
-          
-          // Refresh analytics
-          await fetchAnalytics();
-          break;
-        }
-
-        offset = data.nextOffset;
-        
-        // Small delay between batches
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-    } catch (error) {
-      console.error('Error processing candidates:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to process candidates',
-        variant: 'destructive',
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   const processAnalyticsData = (candidates: any[], marketData: any[]) => {
     // Skill distribution
@@ -218,38 +145,14 @@ export default function HRAnalyticsDashboard() {
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <Button variant="ghost" onClick={() => navigate('/')} className="mb-4">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Dashboard
-            </Button>
-            <h1 className="text-3xl font-bold">AI Analytics Dashboard</h1>
-            <p className="text-muted-foreground">Intelligent insights and market analytics</p>
-          </div>
-          <Button 
-            onClick={processCandidates} 
-            disabled={processing}
-            size="lg"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${processing ? 'animate-spin' : ''}`} />
-            {processing ? 'Processing...' : 'Process All Candidates'}
+        <div>
+          <Button variant="ghost" onClick={() => navigate('/')} className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Dashboard
           </Button>
+          <h1 className="text-3xl font-bold">AI Analytics Dashboard</h1>
+          <p className="text-muted-foreground">Intelligent insights and market analytics</p>
         </div>
-
-        {/* Processing Progress */}
-        {processing && (
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Processing Progress</span>
-                <span className="text-sm text-muted-foreground">{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} />
-              <p className="text-sm text-muted-foreground">{processStatus}</p>
-            </div>
-          </Card>
-        )}
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
