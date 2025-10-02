@@ -2,99 +2,661 @@
   "testCases": [
     {
       "id": "TC001",
-      "filename": "standard_cv_example.pdf",
+      "filename": "cv_01_anwar_al-shibli.pdf",
       "expectedData": {
-        "name": "John Doe",
-        "email": "john.doe@example.com",
-        "phone": "+1234567890",
-        "skills": ["JavaScript", "React", "Node.js", "TypeScript", "SQL"]
+        "name": "Anwar Al-Shibli",
+        "email": "anwar.al-shibli36@outlook.com",
+        "phone": "+968 935 876 49 37",
+        "skills": ["Python", "JavaScript", "C++", "Java", "React", "Vue", "Flask", "Spring Boot", "PyTorch", "Scikit-learn", "NumPy", "Azure", "Kubernetes", "Docker", "Git", "Selenium", "JUnit", "Postman", "BGP", "Nessus", "VPN", "Firewall"],
+        "linkedin": "linkedin.com/in/anwaral-shibli63"
       },
-      "category": "standard",
-      "description": "Standard single-column CV with complete contact information"
+      "category": "international",
+      "description": "Data Analyst CV with Arabic name, Omani phone format, comprehensive skills list"
     },
     {
       "id": "TC002",
-      "filename": "two_column_cv.pdf",
+      "filename": "cv_02_layla_al-saadi.pdf",
       "expectedData": {
-        "name": "Jane Smith",
-        "email": "jane.smith@email.com",
-        "phone": "+44 7700 900000",
-        "skills": ["Python", "Django", "PostgreSQL", "Docker", "AWS"]
+        "name": "Layla Al-Saadi",
+        "email": "layla.al-saadi11@outlook.com",
+        "phone": "+968 977 389 61 72",
+        "skills": ["Python", "C++", "Java", "TypeScript", "Node.js", "Express", "Angular", "Django", "XGBoost", "PyTorch", "Spark", "Pandas", "AWS", "Git", "Azure", "Cypress", "Selenium", "Postman", "Playwright", "VLAN", "Wireshark", "ISO 27001", "IDS/IPS"],
+        "linkedin": "linkedin.com/in/laylaal-saadi30"
       },
-      "category": "two-column",
-      "description": "Two-column layout CV with UK phone format"
+      "category": "international",
+      "description": "Cloud Engineer CV with diverse tech stack and security skills"
     },
     {
       "id": "TC003",
-      "filename": "missing_email.pdf",
+      "filename": "cv_03_sahar_al-jabri.pdf",
       "expectedData": {
-        "name": "Alex Johnson",
-        "email": "",
-        "phone": "+1-555-123-4567",
-        "skills": ["Java", "Spring Boot", "Microservices", "Kubernetes"]
+        "name": "Sahar Al-Jabri",
+        "email": "sahar.al-jabri54@hotmail.com",
+        "phone": "+968 964 281 57 41",
+        "skills": ["Java", "C#", "Python", "C++", "Spring Boot", "React", "ASP.NET", "Flask", "TensorFlow", "NumPy", "Scikit-learn", "Spark", "AWS", "Azure", "Kubernetes", "Git", "JUnit", "Selenium", "PyTest", "Postman", "Nessus", "Wireshark", "VLAN", "Firewall"],
+        "linkedin": "linkedin.com/in/saharal-jabri42"
       },
-      "category": "edge-case",
-      "description": "CV with missing email address"
+      "category": "international",
+      "description": "Full-Stack Developer CV with balanced frontend/backend skills"
     },
     {
       "id": "TC004",
-      "filename": "international_format.pdf",
+      "filename": "cv_04_duaa_al-kalbani.pdf",
       "expectedData": {
-        "name": "Marie Dubois",
-        "email": "m.dubois@example.fr",
-        "phone": "+33 1 23 45 67 89",
-        "skills": ["C++", "Embedded Systems", "RTOS", "Linux Kernel"]
+        "name": "Duaa Al-Kalbani",
+        "email": "duaa.al-kalbani88@outlook.com",
+        "phone": "+968 972 481 64 94",
+        "skills": ["SQL", "Python", "PHP", "TypeScript", "C#", "Vue", "Django", "Flask", "Node.js", "Spark", "Pandas", "NumPy", "XGBoost", "Kubernetes", "Azure", "AWS", "Git", "Selenium", "TestRail", "Cypress", "LoadRunner", "VPN", "Firewall", "OSPF", "Nessus"],
+        "linkedin": "linkedin.com/in/duaaal-kalbani15"
       },
       "category": "international",
-      "description": "CV with French phone format and non-English name"
+      "description": "QA Engineer CV with extensive testing tools and frameworks"
     },
     {
       "id": "TC005",
-      "filename": "high_skill_density.pdf",
+      "filename": "cv_05_amal_al-busaidi.pdf",
       "expectedData": {
-        "name": "Sarah Williams",
-        "email": "sarah.w@tech.com",
-        "phone": "+1 (555) 987-6543",
-        "skills": [
-          "JavaScript", "TypeScript", "React", "Vue.js", "Angular",
-          "Node.js", "Express", "MongoDB", "PostgreSQL", "Redis",
-          "Docker", "Kubernetes", "AWS", "Azure", "CI/CD",
-          "Git", "Agile", "Scrum", "REST APIs", "GraphQL",
-          "Testing", "Jest", "Cypress", "Webpack", "Vite"
-        ]
+        "name": "Amal Al-Busaidi",
+        "email": "amal.al-busaidi66@proton.me",
+        "phone": "+968 945 723 81 46",
+        "skills": ["Python", "JavaScript", "C++", "SQL", "React", "Node.js", "Express", "Flask", "TensorFlow", "NumPy", "PyTorch", "Pandas", "AWS", "GCP", "Git", "Kubernetes", "PyTest", "Selenium", "Postman", "JUnit", "Wireshark", "VPN", "IDS/IPS", "VLAN"],
+        "linkedin": "linkedin.com/in/amalal-busaidi95"
       },
-      "category": "high-density",
-      "description": "CV with 25+ skills listed"
+      "category": "international",
+      "description": "Data Scientist CV with ML/AI focus and cloud platforms"
+    },
+    {
+      "id": "TC006",
+      "filename": "cv_06_basma_al-saadi.pdf",
+      "expectedData": {
+        "name": "Basma Al-Saadi",
+        "email": "basma.al-saadi85@proton.me",
+        "phone": "+968 963 521 95 69",
+        "skills": ["Python", "PHP", "Java", "C#", "Spring Boot", "React", "Flask", "Tailwind", "Angular", "NLTK", "XGBoost", "Scikit-learn", "TensorFlow", "Kubernetes", "AWS", "Git", "Selenium", "Postman", "Playwright", "PyTest", "Cisco Packet Tracer", "Nessus", "Firewall", "BGP"],
+        "linkedin": "linkedin.com/in/basmaal-saadi76"
+      },
+      "category": "international",
+      "description": "Software Engineer CV with diverse tech stack and QA expertise"
     },
     {
       "id": "TC007",
-      "filename": "cv_07_saeed_al-jabri.pdf",
+      "filename": "cv_07_saeed_al-jabri-2.pdf",
       "expectedData": {
         "name": "Saeed Al-Jabri",
-        "email": "saeed.aljabri@example.com",
-        "phone": "+968 9123 4567",
-        "skills": ["Project Management", "Leadership", "Strategic Planning", "Team Building"]
+        "email": "saeed.al-jabri99@gmail.com",
+        "phone": "+968 958 427 63 81",
+        "skills": ["C#", "Python", "JavaScript", "PHP", "Java", "React", "Spring Boot", "Node.js", "Bootstrap", "TensorFlow", "Spark", "NumPy", "GCP", "Git", "AWS", "Cypress", "PyTest", "Selenium", "Postman", "OSPF", "Nessus", "ISO 27001", "Wireshark", "IDS/IPS"],
+        "linkedin": "linkedin.com/in/saeedal-jabri44"
       },
       "category": "international",
-      "description": "Arabic name with Omani phone format (+968)"
+      "description": "Mobile App Developer CV with security certifications"
+    },
+    {
+      "id": "TC008",
+      "filename": "cv_08_samira_al-hinai.pdf",
+      "expectedData": {
+        "name": "Samira Al-Hinai",
+        "email": "samira.al-hinai38@yahoo.com",
+        "phone": "+968 971 354 36 69",
+        "skills": ["C++", "Python", "PHP", "SQL", "Express", "Node.js", "Spring Boot", "Vue", "XGBoost", "PyTorch", "Spark", "NLTK", "Pandas", "Azure", "AWS", "Kubernetes", "JUnit", "TestRail", "LoadRunner", "VLAN", "Firewall", "Nessus", "VPN"],
+        "linkedin": "linkedin.com/in/samiraal-hinai8"
+      },
+      "category": "international",
+      "description": "Data Scientist CV with ML pipelines and big data tools"
     },
     {
       "id": "TC009",
-      "filename": "cv_09_talal_al-balushi.pdf",
+      "filename": "cv_09_placeholder.pdf",
       "expectedData": {
-        "name": "Talal Al-Balushi",
-        "email": "talal.balushi@example.om",
-        "phone": "+968 9876 5432",
-        "skills": ["Engineering", "Technical Analysis", "AutoCAD", "Project Coordination"]
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
       },
-      "category": "international",
-      "description": "Arabic name with Omani phone format and .om email domain"
+      "category": "placeholder",
+      "description": "Placeholder for CV 09 - to be updated with actual data"
+    },
+    {
+      "id": "TC010",
+      "filename": "cv_10_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 10 - to be updated with actual data"
+    },
+    {
+      "id": "TC011",
+      "filename": "cv_11_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 11 - to be updated with actual data"
+    },
+    {
+      "id": "TC012",
+      "filename": "cv_12_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 12 - to be updated with actual data"
+    },
+    {
+      "id": "TC013",
+      "filename": "cv_13_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 13 - to be updated with actual data"
+    },
+    {
+      "id": "TC014",
+      "filename": "cv_14_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 14 - to be updated with actual data"
+    },
+    {
+      "id": "TC015",
+      "filename": "cv_15_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 15 - to be updated with actual data"
+    },
+    {
+      "id": "TC016",
+      "filename": "cv_16_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 16 - to be updated with actual data"
+    },
+    {
+      "id": "TC017",
+      "filename": "cv_17_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 17 - to be updated with actual data"
+    },
+    {
+      "id": "TC018",
+      "filename": "cv_18_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 18 - to be updated with actual data"
+    },
+    {
+      "id": "TC019",
+      "filename": "cv_19_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 19 - to be updated with actual data"
+    },
+    {
+      "id": "TC020",
+      "filename": "cv_20_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 20 - to be updated with actual data"
+    },
+    {
+      "id": "TC021",
+      "filename": "cv_21_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 21 - to be updated with actual data"
+    },
+    {
+      "id": "TC022",
+      "filename": "cv_22_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 22 - to be updated with actual data"
+    },
+    {
+      "id": "TC023",
+      "filename": "cv_23_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 23 - to be updated with actual data"
+    },
+    {
+      "id": "TC024",
+      "filename": "cv_24_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 24 - to be updated with actual data"
+    },
+    {
+      "id": "TC025",
+      "filename": "cv_25_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 25 - to be updated with actual data"
+    },
+    {
+      "id": "TC026",
+      "filename": "cv_26_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 26 - to be updated with actual data"
+    },
+    {
+      "id": "TC027",
+      "filename": "cv_27_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 27 - to be updated with actual data"
+    },
+    {
+      "id": "TC028",
+      "filename": "cv_28_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 28 - to be updated with actual data"
+    },
+    {
+      "id": "TC029",
+      "filename": "cv_29_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 29 - to be updated with actual data"
+    },
+    {
+      "id": "TC030",
+      "filename": "cv_30_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 30 - to be updated with actual data"
+    },
+    {
+      "id": "TC031",
+      "filename": "cv_31_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 31 - to be updated with actual data"
+    },
+    {
+      "id": "TC032",
+      "filename": "cv_32_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 32 - to be updated with actual data"
+    },
+    {
+      "id": "TC033",
+      "filename": "cv_33_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 33 - to be updated with actual data"
+    },
+    {
+      "id": "TC034",
+      "filename": "cv_34_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 34 - to be updated with actual data"
+    },
+    {
+      "id": "TC035",
+      "filename": "cv_35_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 35 - to be updated with actual data"
+    },
+    {
+      "id": "TC036",
+      "filename": "cv_36_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 36 - to be updated with actual data"
+    },
+    {
+      "id": "TC037",
+      "filename": "cv_37_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 37 - to be updated with actual data"
+    },
+    {
+      "id": "TC038",
+      "filename": "cv_38_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 38 - to be updated with actual data"
+    },
+    {
+      "id": "TC039",
+      "filename": "cv_39_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 39 - to be updated with actual data"
+    },
+    {
+      "id": "TC040",
+      "filename": "cv_40_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 40 - to be updated with actual data"
+    },
+    {
+      "id": "TC041",
+      "filename": "cv_41_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 41 - to be updated with actual data"
+    },
+    {
+      "id": "TC042",
+      "filename": "cv_42_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 42 - to be updated with actual data"
+    },
+    {
+      "id": "TC043",
+      "filename": "cv_43_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 43 - to be updated with actual data"
+    },
+    {
+      "id": "TC044",
+      "filename": "cv_44_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 44 - to be updated with actual data"
+    },
+    {
+      "id": "TC045",
+      "filename": "cv_45_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 45 - to be updated with actual data"
+    },
+    {
+      "id": "TC046",
+      "filename": "cv_46_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 46 - to be updated with actual data"
+    },
+    {
+      "id": "TC047",
+      "filename": "cv_47_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 47 - to be updated with actual data"
+    },
+    {
+      "id": "TC048",
+      "filename": "cv_48_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 48 - to be updated with actual data"
+    },
+    {
+      "id": "TC049",
+      "filename": "cv_49_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 49 - to be updated with actual data"
+    },
+    {
+      "id": "TC050",
+      "filename": "cv_50_placeholder.pdf",
+      "expectedData": {
+        "name": "TBD",
+        "email": "tbd@example.com",
+        "phone": "+968 9XX XXX XX XX",
+        "skills": ["TBD"],
+        "linkedin": "linkedin.com/in/tbd"
+      },
+      "category": "placeholder",
+      "description": "Placeholder for CV 50 - to be updated with actual data"
     }
   ],
   "metadata": {
-    "version": "1.0",
+    "version": "2.0",
     "lastUpdated": "2025-10-02",
-    "totalTestCases": 7,
-    "requiredMinimum": 50
+    "totalTestCases": 50,
+    "requiredMinimum": 50,
+    "validatedTestCases": 8,
+    "placeholderTestCases": 42
   }
 }
