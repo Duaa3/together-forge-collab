@@ -1,0 +1,76 @@
+{
+  "testCases": [
+    {
+      "id": "TC001",
+      "filename": "standard_cv_example.pdf",
+      "expectedData": {
+        "name": "John Doe",
+        "email": "john.doe@example.com",
+        "phone": "+1234567890",
+        "skills": ["JavaScript", "React", "Node.js", "TypeScript", "SQL"]
+      },
+      "category": "standard",
+      "description": "Standard single-column CV with complete contact information"
+    },
+    {
+      "id": "TC002",
+      "filename": "two_column_cv.pdf",
+      "expectedData": {
+        "name": "Jane Smith",
+        "email": "jane.smith@email.com",
+        "phone": "+44 7700 900000",
+        "skills": ["Python", "Django", "PostgreSQL", "Docker", "AWS"]
+      },
+      "category": "two-column",
+      "description": "Two-column layout CV with UK phone format"
+    },
+    {
+      "id": "TC003",
+      "filename": "missing_email.pdf",
+      "expectedData": {
+        "name": "Alex Johnson",
+        "email": "",
+        "phone": "+1-555-123-4567",
+        "skills": ["Java", "Spring Boot", "Microservices", "Kubernetes"]
+      },
+      "category": "edge-case",
+      "description": "CV with missing email address"
+    },
+    {
+      "id": "TC004",
+      "filename": "international_format.pdf",
+      "expectedData": {
+        "name": "Marie Dubois",
+        "email": "m.dubois@example.fr",
+        "phone": "+33 1 23 45 67 89",
+        "skills": ["C++", "Embedded Systems", "RTOS", "Linux Kernel"]
+      },
+      "category": "international",
+      "description": "CV with French phone format and non-English name"
+    },
+    {
+      "id": "TC005",
+      "filename": "high_skill_density.pdf",
+      "expectedData": {
+        "name": "Sarah Williams",
+        "email": "sarah.w@tech.com",
+        "phone": "+1 (555) 987-6543",
+        "skills": [
+          "JavaScript", "TypeScript", "React", "Vue.js", "Angular",
+          "Node.js", "Express", "MongoDB", "PostgreSQL", "Redis",
+          "Docker", "Kubernetes", "AWS", "Azure", "CI/CD",
+          "Git", "Agile", "Scrum", "REST APIs", "GraphQL",
+          "Testing", "Jest", "Cypress", "Webpack", "Vite"
+        ]
+      },
+      "category": "high-density",
+      "description": "CV with 25+ skills listed"
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "lastUpdated": "2025-10-02",
+    "totalTestCases": 5,
+    "requiredMinimum": 50
+  }
+}
