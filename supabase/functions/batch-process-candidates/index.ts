@@ -23,7 +23,7 @@ serve(async (req) => {
     // Fetch candidates that haven't been processed yet
     const { data: candidates, error: fetchError } = await supabase
       .from('candidates')
-      .select('id, cv_text, skills')
+      .select('id, cv_path, extracted_skills')
       .order('created_at', { ascending: true })
       .range(offset, offset + batchSize - 1);
 
@@ -78,13 +78,32 @@ serve(async (req) => {
 
         const jobRequirements = jobs?.job_description || 'General technical position requiring programming skills';
 
+        // Extract CV text from file
+        console.log(`Extracting CV text for candidate ${candidate.id}`);
+        const { data: cvData, error: cvError } = await supabase.functions.invoke(
+          'parse-cv',
+          {
+            body: {
+              cvPath: candidate.cv_path,
+            },
+          }
+        );
+
+        if (cvError || !cvData?.text) {
+          console.error(`Failed to extract CV text for candidate ${candidate.id}:`, cvError);
+          results.errors.push({ candidateId: candidate.id, error: 'Failed to extract CV text' });
+          continue;
+        }
+
+        const cvText = cvData.text;
+
         // Run advanced analysis
         console.log(`Analyzing candidate ${candidate.id}`);
         const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
           'analyze-candidate-advanced',
           {
             body: {
-              cvText: candidate.cv_text,
+              cvText: cvText,
               jobRequirements: jobRequirements,
             },
           }
@@ -103,8 +122,8 @@ serve(async (req) => {
           {
             body: {
               candidateData: {
-                cv_text: candidate.cv_text,
-                skills: candidate.skills,
+                cv_text: cvText,
+                skills: candidate.extracted_skills,
               },
               jobRequirements: jobRequirements,
               advancedAnalysis: analysisData?.analysis,
@@ -142,8 +161,8 @@ serve(async (req) => {
         }
 
         // Collect skills for market analysis
-        if (candidate.skills && Array.isArray(candidate.skills)) {
-          candidate.skills.forEach((skill: string) => results.skills.add(skill));
+        if (candidate.extracted_skills && Array.isArray(candidate.extracted_skills)) {
+          candidate.extracted_skills.forEach((skill: string) => results.skills.add(skill));
         }
 
         results.processed++;
