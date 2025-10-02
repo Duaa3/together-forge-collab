@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import testCases from "../../../tests/test-cases/extraction-test-cases.json";
+import { PdfProcessor } from "@/lib/pdf/PdfProcessor";
+import { CandidateExtractor } from "@/lib/extraction/CandidateExtractor";
 
 interface TestResult {
   testCaseId: string;
@@ -81,12 +83,20 @@ export const CVTestRunner = () => {
 
           if (downloadError) throw downloadError;
 
-          // Call parse-cv edge function
-          const { data: parseResult, error: parseError } = await supabase.functions.invoke('parse-cv', {
-            body: { file: await fileData.arrayBuffer() }
-          });
-
-          if (parseError) throw parseError;
+          // Use client-side PDF processor (same as TestCVUploader)
+          const processor = new PdfProcessor();
+          const fileBlob = new File([fileData], file.filename);
+          const text = await processor.extractText(fileBlob);
+          
+          // Use client-side candidate extractor
+          const extracted = CandidateExtractor.extract(text, file.filename);
+          
+          const parseResult = {
+            name: extracted.name || 'Unknown Candidate',
+            email: extracted.email || '',
+            phone: extracted.phone || '',
+            extractedSkills: extracted.skills || []
+          };
 
           // Compare results
           const fieldResults = {

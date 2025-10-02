@@ -65,12 +65,36 @@
       },
       "category": "high-density",
       "description": "CV with 25+ skills listed"
+    },
+    {
+      "id": "TC007",
+      "filename": "cv_07_saeed_al-jabri.pdf",
+      "expectedData": {
+        "name": "Saeed Al-Jabri",
+        "email": "saeed.aljabri@example.com",
+        "phone": "+968 9123 4567",
+        "skills": ["Project Management", "Leadership", "Strategic Planning", "Team Building"]
+      },
+      "category": "international",
+      "description": "Arabic name with Omani phone format (+968)"
+    },
+    {
+      "id": "TC009",
+      "filename": "cv_09_talal_al-balushi.pdf",
+      "expectedData": {
+        "name": "Talal Al-Balushi",
+        "email": "talal.balushi@example.om",
+        "phone": "+968 9876 5432",
+        "skills": ["Engineering", "Technical Analysis", "AutoCAD", "Project Coordination"]
+      },
+      "category": "international",
+      "description": "Arabic name with Omani phone format and .om email domain"
     }
   ],
   "metadata": {
     "version": "1.0",
     "lastUpdated": "2025-10-02",
-    "totalTestCases": 5,
+    "totalTestCases": 7,
     "requiredMinimum": 50
   }
 }
