@@ -5,7 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle, XCircle, Clock, Mail, Phone, Github, Linkedin, Globe, ChevronDown, ChevronUp, Check, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import UploadCVDialog from "@/components/UploadCVDialog";
 import { AIExplanationPanel } from "@/components/AIExplanationPanel";
 import type { Database } from "@/integrations/supabase/types";
@@ -36,6 +46,13 @@ const JobDetail = () => {
   const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [updatingDecision, setUpdatingDecision] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    candidateId: string;
+    candidateName: string;
+    decision: "accept" | "reject";
+  } | null>(null);
 
   useEffect(() => {
     fetchJobAndCandidates();
@@ -141,6 +158,52 @@ const JobDetail = () => {
       }
       return newSet;
     });
+  };
+
+  const handleDecisionClick = (candidateId: string, candidateName: string, decision: "accept" | "reject") => {
+    setConfirmDialog({
+      open: true,
+      candidateId,
+      candidateName,
+      decision,
+    });
+  };
+
+  const updateCandidateDecision = async () => {
+    if (!confirmDialog) return;
+
+    const { candidateId, decision } = confirmDialog;
+    setUpdatingDecision(candidateId);
+
+    try {
+      const { error } = await supabase
+        .from("candidates")
+        .update({ decision })
+        .eq("id", candidateId);
+
+      if (error) throw error;
+
+      // Optimistic update
+      setCandidates(prev =>
+        prev.map(c =>
+          c.id === candidateId ? { ...c, decision } : c
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `Candidate ${decision === "accept" ? "accepted" : "rejected"} successfully`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingDecision(null);
+      setConfirmDialog(null);
+    }
   };
 
   if (loading) {
@@ -274,9 +337,37 @@ const JobDetail = () => {
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        {getDecisionBadge(candidate.decision, candidate.match_score)}
-                        <div className="flex flex-col items-end mt-2">
+                      <div className="flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-2">
+                          {getDecisionBadge(candidate.decision, candidate.match_score)}
+                          
+                          {(!candidate.decision || candidate.decision === "pending") && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1 border-success text-success hover:bg-success hover:text-success-foreground"
+                                onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "accept")}
+                                disabled={updatingDecision === candidate.id}
+                              >
+                                <Check className="w-3 h-3" />
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "reject")}
+                                disabled={updatingDecision === candidate.id}
+                              >
+                                <X className="w-3 h-3" />
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col items-end">
                           {mlScore ? (
                             <>
                               <div className={`text-3xl font-bold ${getScoreColor(mlScore.overall_score)}`}>
@@ -393,6 +484,26 @@ const JobDetail = () => {
         job={job}
         onCandidatesAdded={fetchJobAndCandidates}
       />
+
+      <AlertDialog open={confirmDialog?.open || false} onOpenChange={(open) => !open && setConfirmDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmDialog?.decision === "accept" ? "Accept" : "Reject"} Candidate
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {confirmDialog?.decision} <strong>{confirmDialog?.candidateName}</strong>? 
+              This will update their application status.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={updateCandidateDecision}>
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
