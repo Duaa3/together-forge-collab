@@ -58,6 +58,7 @@ const JobDetail = () => {
     candidateId: string;
     candidateName: string;
   } | null>(null);
+  const [changingStatus, setChangingStatus] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchJobAndCandidates();
@@ -386,26 +387,41 @@ const JobDetail = () => {
                           {getDecisionBadge(candidate.decision, candidate.match_score)}
                           
                           <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 gap-1 border-success text-success hover:bg-success hover:text-success-foreground"
-                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "accepted")}
-                              disabled={updatingDecision === candidate.id}
-                            >
-                              <Check className="w-3 h-3" />
-                              Accept
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "rejected")}
-                              disabled={updatingDecision === candidate.id}
-                            >
-                              <X className="w-3 h-3" />
-                              Reject
-                            </Button>
+                            {(candidate.decision === "pending" || changingStatus.has(candidate.id)) ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 gap-1 border-success text-success hover:bg-success hover:text-success-foreground"
+                                  onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "accepted")}
+                                  disabled={updatingDecision === candidate.id}
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Accept
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                  onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "rejected")}
+                                  disabled={updatingDecision === candidate.id}
+                                >
+                                  <X className="w-3 h-3" />
+                                  Reject
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1"
+                                onClick={() => {
+                                  setChangingStatus(prev => new Set(prev).add(candidate.id));
+                                }}
+                              >
+                                Change Status
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
