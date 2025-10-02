@@ -196,6 +196,13 @@ const JobDetail = () => {
         )
       );
 
+      // Remove from changingStatus set
+      setChangingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(candidateId);
+        return newSet;
+      });
+
       toast({
         title: "Success",
         description: `Candidate ${decision === "accepted" ? "accepted" : "rejected"} successfully`,
