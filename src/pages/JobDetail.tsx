@@ -51,7 +51,7 @@ const JobDetail = () => {
     open: boolean;
     candidateId: string;
     candidateName: string;
-    decision: "accept" | "reject";
+    decision: "accepted" | "rejected";
   } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -165,7 +165,7 @@ const JobDetail = () => {
     });
   };
 
-  const handleDecisionClick = (candidateId: string, candidateName: string, decision: "accept" | "reject") => {
+  const handleDecisionClick = (candidateId: string, candidateName: string, decision: "accepted" | "rejected") => {
     setConfirmDialog({
       open: true,
       candidateId,
@@ -197,7 +197,7 @@ const JobDetail = () => {
 
       toast({
         title: "Success",
-        description: `Candidate ${decision === "accept" ? "accepted" : "rejected"} successfully`,
+        description: `Candidate ${decision === "accepted" ? "accepted" : "rejected"} successfully`,
       });
     } catch (error: any) {
       toast({
@@ -390,7 +390,7 @@ const JobDetail = () => {
                               size="sm"
                               variant="outline"
                               className="h-8 gap-1 border-success text-success hover:bg-success hover:text-success-foreground"
-                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "accept")}
+                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "accepted")}
                               disabled={updatingDecision === candidate.id}
                             >
                               <Check className="w-3 h-3" />
@@ -400,7 +400,7 @@ const JobDetail = () => {
                               size="sm"
                               variant="outline"
                               className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "reject")}
+                              onClick={() => handleDecisionClick(candidate.id, candidate.name || "Unknown", "rejected")}
                               disabled={updatingDecision === candidate.id}
                             >
                               <X className="w-3 h-3" />
@@ -540,10 +540,10 @@ const JobDetail = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmDialog?.decision === "accept" ? "Accept" : "Reject"} Candidate
+              {confirmDialog?.decision === "accepted" ? "Accept" : "Reject"} Candidate
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to {confirmDialog?.decision} <strong>{confirmDialog?.candidateName}</strong>? 
+              Are you sure you want to {confirmDialog?.decision === "accepted" ? "accept" : "reject"} <strong>{confirmDialog?.candidateName}</strong>? 
               This will update their application status.
             </AlertDialogDescription>
           </AlertDialogHeader>
