@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, Database, Shield, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface DiagnosticResult {
   storageHealth: 'checking' | 'healthy' | 'error';
@@ -23,6 +24,28 @@ export const TestSystemDiagnostics = () => {
     rlsPolicies: 'checking',
     testFilesCount: 0
   });
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  const initializeStorage = async () => {
+    setIsInitializing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('initialize-storage');
+      
+      if (error) throw error;
+      
+      if (data?.success) {
+        toast.success('Storage initialized successfully!');
+        await runDiagnostics();
+      } else {
+        toast.error(data?.error || 'Failed to initialize storage');
+      }
+    } catch (error: any) {
+      console.error('Storage initialization error:', error);
+      toast.error(error.message || 'Failed to initialize storage');
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   const runDiagnostics = async () => {
     setDiagnostics({
@@ -150,9 +173,20 @@ export const TestSystemDiagnostics = () => {
           )}
         </div>
 
-        <Button onClick={runDiagnostics} variant="outline" size="sm" className="w-full">
-          Refresh Diagnostics
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={initializeStorage} 
+            variant="default" 
+            size="sm"
+            disabled={isInitializing}
+            className="flex-1"
+          >
+            {isInitializing ? 'Initializing...' : 'Initialize Storage'}
+          </Button>
+          <Button onClick={runDiagnostics} variant="outline" size="sm" className="flex-1">
+            Refresh Diagnostics
+          </Button>
+        </div>
 
         {diagnostics.storageHealth === 'error' && (
           <Alert variant="destructive">
