@@ -19,7 +19,7 @@ const Dashboard = () => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      navigate("/auth");
+      navigate("/");
       return;
     }
     
@@ -47,7 +47,7 @@ const Dashboard = () => {
         variant: "destructive",
       });
       await supabase.auth.signOut();
-      navigate("/auth");
+      navigate("/");
       return;
     }
 
