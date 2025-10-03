@@ -91,32 +91,37 @@ const CandidateDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/20">
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/20 relative overflow-hidden">
+      <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent-vibrant/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
+      
+      <header className="glassmorphic border-b sticky top-0 z-50 animate-fade-in">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Briefcase className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold">Job Portal</h1>
+            <div className="p-2 bg-gradient-to-br from-primary to-accent-vibrant rounded-lg">
+              <Briefcase className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <h1 className="text-2xl font-bold gradient-text">Job Portal</h1>
           </div>
-          <Button onClick={handleLogout} variant="outline" size="sm">
+          <Button onClick={handleLogout} variant="outline" size="sm" className="hover-lift">
             <LogOut className="w-4 h-4 mr-2" />
             Logout
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 relative z-10">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-3 mb-8">
-            <TabsTrigger value="dashboard">
+          <TabsList className="grid w-full max-w-md grid-cols-3 mb-8 glassmorphic animate-slide-up">
+            <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Briefcase className="w-4 h-4 mr-2" />
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="profile">
+            <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <User className="w-4 h-4 mr-2" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="applications">
+            <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="w-4 h-4 mr-2" />
               My Applications
             </TabsTrigger>
@@ -124,15 +129,17 @@ const CandidateDashboard = () => {
 
           <TabsContent value="dashboard">
             <section>
-              <h2 className="text-2xl font-bold mb-6">Available Jobs</h2>
+              <h2 className="text-2xl font-bold mb-6 gradient-text animate-fade-in">Available Jobs</h2>
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {jobs.map((job) => {
+                {jobs.map((job, index) => {
                   const applied = hasApplied(job.id);
                   return (
-                    <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                    <Card key={job.id} className="hover-lift border-2 hover:border-primary/50 group animate-scale-in" style={{ animationDelay: `${index * 0.1}s` }}>
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Briefcase className="w-5 h-5 text-primary" />
+                        <CardTitle className="flex items-center gap-2 group-hover:text-primary transition-colors">
+                          <div className="p-1.5 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                            <Briefcase className="w-4 h-4" />
+                          </div>
                           {job.title}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-2">

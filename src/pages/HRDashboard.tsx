@@ -100,23 +100,28 @@ const HRDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/20">
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/20 relative overflow-hidden">
+      <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent-vibrant/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
+      
+      <header className="glassmorphic border-b sticky top-0 z-50 animate-fade-in">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Briefcase className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold">HR Dashboard</h1>
+            <div className="p-2 bg-gradient-to-br from-primary to-accent-vibrant rounded-lg">
+              <Briefcase className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <h1 className="text-2xl font-bold gradient-text">HR Dashboard</h1>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => navigate('/analytics')} variant="outline">
+            <Button onClick={() => navigate('/analytics')} variant="outline" className="hover-lift">
               <BarChart3 className="w-4 h-4 mr-2" />
               Analytics
             </Button>
-            <Button onClick={() => setCreateJobOpen(true)}>
+            <Button onClick={() => setCreateJobOpen(true)} variant="premium">
               <Plus className="w-4 h-4 mr-2" />
               Create Job
             </Button>
-            <Button onClick={handleLogout} variant="outline" size="sm">
+            <Button onClick={handleLogout} variant="outline" size="sm" className="hover-lift">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </Button>
@@ -124,19 +129,21 @@ const HRDashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Manage Job Postings</h2>
+      <main className="container mx-auto px-4 py-8 relative z-10">
+        <div className="mb-8 animate-slide-up">
+          <h2 className="text-3xl font-bold mb-2 gradient-text">Manage Job Postings</h2>
           <p className="text-muted-foreground">Create and review job positions and candidates</p>
         </div>
 
         {jobs.length === 0 ? (
-          <Card className="text-center py-12">
+          <Card className="text-center py-12 hover-lift animate-scale-in">
             <CardContent>
-              <Briefcase className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <div className="inline-flex p-4 bg-primary/10 rounded-full mb-4 animate-float">
+                <Briefcase className="w-16 h-16 text-primary" />
+              </div>
               <h3 className="text-xl font-semibold mb-2">No jobs yet</h3>
               <p className="text-muted-foreground mb-4">Create your first job posting to get started</p>
-              <Button onClick={() => setCreateJobOpen(true)}>
+              <Button onClick={() => setCreateJobOpen(true)} variant="premium">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Job
               </Button>
@@ -144,10 +151,11 @@ const HRDashboard = () => {
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {jobs.map((job) => (
+            {jobs.map((job, index) => (
               <Card 
                 key={job.id} 
-                className="hover:shadow-lg transition-shadow cursor-pointer relative"
+                className="hover-lift cursor-pointer relative group border-2 hover:border-primary/50 animate-scale-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
                 onClick={() => navigate(`/jobs/${job.id}`)}
               >
                 <Button
@@ -166,8 +174,10 @@ const HRDashboard = () => {
                   <Trash2 className="w-4 h-4" />
                 </Button>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 pr-8">
-                    <Briefcase className="w-5 h-5 text-primary" />
+                  <CardTitle className="flex items-center gap-2 pr-8 group-hover:text-primary transition-colors">
+                    <div className="p-1.5 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <Briefcase className="w-4 h-4" />
+                    </div>
                     {job.title}
                   </CardTitle>
                   <CardDescription>
