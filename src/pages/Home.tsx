@@ -9,8 +9,8 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Animated Background Blobs */}
-          <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full animate-float" />
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/5 rounded-full animate-float" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
       
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center relative z-10">
