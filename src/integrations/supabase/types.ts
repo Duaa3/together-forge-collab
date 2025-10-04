@@ -51,12 +51,14 @@ export type Database = {
       }
       candidates: {
         Row: {
+          category_confidence: number | null
           cv_path: string | null
           decision: string | null
           email: string | null
           extracted_skills: Json | null
           github: string | null
           id: string
+          job_category: string | null
           job_id: string
           linkedin: string | null
           match_score: number | null
@@ -67,12 +69,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category_confidence?: number | null
           cv_path?: string | null
           decision?: string | null
           email?: string | null
           extracted_skills?: Json | null
           github?: string | null
           id?: string
+          job_category?: string | null
           job_id: string
           linkedin?: string | null
           match_score?: number | null
@@ -83,12 +87,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category_confidence?: number | null
           cv_path?: string | null
           decision?: string | null
           email?: string | null
           extracted_skills?: Json | null
           github?: string | null
           id?: string
+          job_category?: string | null
           job_id?: string
           linkedin?: string | null
           match_score?: number | null

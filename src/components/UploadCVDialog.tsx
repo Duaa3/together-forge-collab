@@ -151,7 +151,7 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
           console.log(`${file.name} - Score: ${score}%, Decision: ${decision}`);
 
           // Insert candidate into database
-          const { error } = await supabase.from("candidates").insert({
+          const { data: candidateData, error } = await supabase.from("candidates").insert({
             job_id: jobId,
             user_id: user.id,
             name,
@@ -162,9 +162,38 @@ const UploadCVDialog = ({ open, onOpenChange, jobId, job, onCandidatesAdded }: U
             extracted_skills: extractedSkills,
             match_score: score,
             decision,
-          });
+          }).select().single();
 
           if (error) throw error;
+
+          // Categorize the CV using AI
+          if (candidateData) {
+            try {
+              const pdfProcessor = new PdfProcessor(() => {});
+              const cvText = await pdfProcessor.extractText(file);
+              
+              const { data: categoryData, error: categoryError } = await supabase.functions.invoke('categorize-cv', {
+                body: { cvText }
+              });
+
+              if (!categoryError && categoryData) {
+                // Update candidate with category
+                await supabase
+                  .from('candidates')
+                  .update({
+                    job_category: categoryData.category,
+                    category_confidence: categoryData.confidence
+                  })
+                  .eq('id', candidateData.id);
+                
+                console.log(`${file.name} categorized as: ${categoryData.category} (${categoryData.confidence}% confidence)`);
+              }
+            } catch (catError) {
+              console.warn(`Failed to categorize ${file.name}:`, catError);
+              // Don't fail the whole process if categorization fails
+            }
+          }
+
           successCount++;
         } catch (error) {
           console.error(`Failed to process ${file.name}:`, error);

@@ -23,7 +23,7 @@ export default function HRAnalyticsDashboard() {
     try {
       setLoading(true);
 
-      // Fetch candidates with ML scores
+      // Fetch candidates with ML scores and categories
       const { data: candidates, error: candidatesError } = await supabase
         .from('candidates')
         .select(`
@@ -95,12 +95,53 @@ export default function HRAnalyticsDashboard() {
       cultural: candidatesWithScores.reduce((sum, c) => sum + (c.ml_scores[0]?.cultural_fit_score || 0), 0) / candidatesWithScores.length || 0,
     };
 
+    // Category distribution
+    const categoryCounts: Record<string, number> = {};
+    const categoryScoreData: Record<string, { total: number; count: number; accepted: number }> = {};
+    
+    candidates.forEach(c => {
+      const category = c.job_category || 'Uncategorized';
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      
+      if (!categoryScoreData[category]) {
+        categoryScoreData[category] = { total: 0, count: 0, accepted: 0 };
+      }
+      
+      if (c.match_score) {
+        categoryScoreData[category].total += c.match_score;
+        categoryScoreData[category].count += 1;
+      }
+      
+      if (c.decision === 'accepted') {
+        categoryScoreData[category].accepted += 1;
+      }
+    });
+
+    const categoryDistribution = Object.entries(categoryCounts)
+      .sort(([, a], [, b]) => b - a)
+      .map(([category, count]) => ({ category, count }));
+
+    const categoryScores = Object.entries(categoryScoreData)
+      .filter(([, data]) => data.count > 0)
+      .map(([category, data]) => ({
+        category,
+        avgScore: Math.round((data.total / data.count) * 100) / 100,
+        count: categoryCounts[category],
+        acceptanceRate: Math.round((data.accepted / categoryCounts[category]) * 100)
+      }))
+      .sort((a, b) => b.avgScore - a.avgScore);
+
+    const topCategories = categoryScores.slice(0, 3);
+
     return {
       totalCandidates: candidates.length,
       topSkills,
       decisionCounts,
       avgScores,
       marketTrends: marketData,
+      categoryDistribution,
+      categoryScores,
+      topCategories,
     };
   };
 
@@ -189,8 +230,76 @@ export default function HRAnalyticsDashboard() {
           </Card>
         </div>
 
+        {/* Top Categories */}
+        {analytics.topCategories && analytics.topCategories.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {analytics.topCategories.map((cat: any, idx: number) => (
+              <Card key={idx} className="p-6">
+                <h4 className="text-sm font-medium text-muted-foreground">Top Category #{idx + 1}</h4>
+                <p className="text-2xl font-bold mt-2">{cat.category}</p>
+                <div className="mt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Candidates:</span>
+                    <span className="font-semibold">{cat.count}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Avg Score:</span>
+                    <span className="font-semibold">{cat.avgScore}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Acceptance:</span>
+                    <span className="font-semibold">{cat.acceptanceRate}%</span>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Category Distribution */}
+          {analytics.categoryDistribution && analytics.categoryDistribution.length > 0 && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Candidate Categories</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={analytics.categoryDistribution.slice(0, 8)}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={(entry) => `${entry.category}: ${entry.count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="count"
+                  >
+                    {analytics.categoryDistribution.slice(0, 8).map((_: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+
+          {/* Average Score by Category */}
+          {analytics.categoryScores && analytics.categoryScores.length > 0 && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Average Score by Category</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.categoryScores.slice(0, 8)}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="category" angle={-45} textAnchor="end" height={100} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip />
+                  <Bar dataKey="avgScore" fill="#10b981" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+
           {/* Top Skills */}
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Top Skills in Candidate Pool</h3>
